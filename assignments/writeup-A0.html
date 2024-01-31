@@ -1,6 +1,6 @@
 **Assignment 0 Report**
 
-AndrewID: XXXX
+AndrewID: tkynard
 
 (##) About this template
 
@@ -14,36 +14,32 @@ AndrewID: XXXX
 
 Step 1: Clone
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step1-github-ref-1.png" alt="Github-CLI">
-</div>
-or
-<div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step1-github-ref-2.png" alt="Github-Web">
+    <img src="A0-writeup/student/myscottyrepo.png" alt="Github-CLI">
 </div>
 
 Step 2: General Setup
 
 Visual Studio:
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step2-vs-ref.png" alt="Visual Studio">
+    <img src="A0-writeup/student/visualstudio2022.png" alt="Visual Studio">
 </div>
 
 Node:
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step2-node-ref.png" alt="Node">
+    <img src="A0-writeup/student/nodemakefile.png" alt="Node">
 </div>
 
 Nest-libs:
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step2-nest-libs-ref.png" alt="Nest-libs">
+    <img src="A0-writeup/student/nestlibs.png" alt="Nest-libs">
 </div>
 
 Step 3: Build and Run
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step3-GUI-ref.png" alt="GUI">
+    <img src="A0-writeup/student/scotty3dgui.png" alt="GUI">
 </div>
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step3-tests-ref.png" alt="Run-tests">
+    <img src="A0-writeup/student/scotty3dtests.png" alt="Run-tests">
 </div>
 
 (##) A0T2
@@ -53,13 +49,14 @@ Your completion of this task will be graded based on your `test.a0.task2.problem
 For each of the problems you solved in task 2, characterise the bug in your own words and explain one other scenario that may cause this 
 type of bug.
 
-Problem 1:
+Problem 1: There was a missing semicolon on line 21, also cour is a typo of std::cout, Another scenario with this bug would be if you accidentally type flot instead of float.
 
-Problem 2:
+Problem 2: The math used in the filter was with ints instead of float types, so the result rounded down and incorrectly filtered the data (casting error). Another scenario that could cause this bug is if you accidentally truncate a float and the outcome is different than expected.
 
-Problem 3:
+Problem 3: The end() function does not return the last element, but goes one after the last element which points to nothing. Another scenario that could cause this bug would be if you go out of bounds when looping through a vector.
 
-Problem 4:
+Problem 4: Checking if all three values are equal to each other cannot be done with (a == b) == c, you must separate them out and use && since if a == b, it becomes 1 and if a != b it becomes 0. Another scenario that could cause this bug would be if instead you did 
+            a == b == c, which doesn't work because the compiler reads left to right and would give the same issue as before.
 
 
 (##) A0T3
@@ -69,6 +66,9 @@ You do not need any screenshots for this task. Your completion will be graded ba
 (##) Feedback
 
 Use this section to provide feedback about the assignment.
+
+I liked the assignment; I was a little stuck because I didn't know I could command click in VScode and that would bring me to the function I was hovering over, 
+but other than that it was cool! 
 
 <!--- Markdeep & image comparison library - probably no need to change anything below -->
 <style class="fallback">body{visibility:hidden;white-space:pre;font-family:monospace}</style>

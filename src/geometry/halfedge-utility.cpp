@@ -862,7 +862,7 @@ Halfedge_Mesh Halfedge_Mesh::from_indexed_mesh(Indexed_Mesh const &indexed_mesh)
 	assert(indexed_mesh.indices().size() % 3 == 0);
 	indexed_faces.reserve(indexed_mesh.indices().size() / 3);
 	for (uint32_t i = 0; i < indexed_mesh.indices().size(); i += 3) {
-		indexed_faces.emplace_back(indexed_mesh.indices().begin() + i, indexed_mesh.indices().begin() + i + 3);
+		indexed_faces.emplace_back(indexed_mesh.indices().begin() + i, indexed_mesh.indices().begin() + i + 3); 
 	}
 
 	//build halfedge mesh with the extracted vertex/face data:
