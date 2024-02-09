@@ -185,4 +185,221 @@ Test test_a1_task2_simple_vertical("a1.task2.simple.vertical", []() {
 	);
 });
 
+Test test_a1_task2_single_valid_pos("a1.task2.single.valid.positive", []() {
+ check_line_covers(
+  "single pixel emitted with positive slope",
+  { Vec2(1.1f, 1.15f), Vec2(1.9f, 1.2f) },
+  {"...",
+   ".#.",
+   "..."}
+ );
+});
+Test test_a1_task2_single_valid_neg("a1.task2.single.valid.negative", []() {
+ check_line_covers(
+  "single pixel emitted with negative slope",
+  { Vec2(1.125f, 1.675f), Vec2(1.875, 1.125f) },
+  {"...",
+   ".#.",
+   "..."}
+ );
+});
+Test test_a1_task2_single_valid_middle("a1.task2.single.valid.middle", []() {
+ check_line_covers(
+  "single pixel emitted but start point is from middle",
+  { Vec2(1.5f, 1.5f), Vec2(1.5f, 2.0f) },
+  {"...",
+   ".#.",
+   "..."}
+ );
+});
+Test test_a1_task2_single_valid_endright("a1.task2.single.valid.endright", []() {
+ check_line_covers(
+  "single pixel emitted but end point is right corner of diamond",
+  { Vec2(1.125f, 1.875f), Vec2(2.0f, 1.5f) },
+  {"...",
+   ".#.",
+   "..."}
+ );
+});
+Test test_a1_task2_single_invalid_left("a1.task2.single.invalid.left", []() {
+ check_line_covers(
+  "end point on left corner = line doesn't 'exit' diamond; also need to swap points for bresenham alg",
+  { Vec2(1.875f, 1.875f), Vec2(1.0f, 1.5f) },
+  {"...",
+   "..."}
+ );
+});
+// edge cases
+Test test_a1_task2_edge_bottom("a1.task2.edge.bottom", []() {
+ check_line_covers(
+  "just crossing bottom corner = enter and exit diamond",
+  { Vec2(1.0f, 1.0f), Vec2(2.0f, 1.0f) },
+  {"...",
+   ".#.",
+   "..."}
+ );
+});
+Test test_a1_task2_edge_left("a1.task2.edge.left", []() {
+ check_line_covers(
+  "just crossing left corner = enter and exit diamond",
+  { Vec2(1.0f, 1.0f), Vec2(1.0f, 3.0f) },
+  {"...",
+   ".#.",
+   ".#.",
+   "..."}
+ );
+});
+Test test_a1_task2_edge_invalid("a1.task2.edge.invalid", []() {
+ check_line_covers(
+  "line crosses 2 pixels but emits none",
+  { Vec2(1.1f, 1.2f), Vec2(1.25f, 0.8f) },
+  {"...",
+   "..."}
+ );
+});
 
+// breadth cases
+Test test_a1_task2_breadth_pos_1("a1.task2.breadth.pos.1", []() {
+ check_line_covers(
+  "line with slope m<=1",
+  { Vec2(1.25f, 1.875f), Vec2(6.0f, 6.625f) },
+  {".....#",
+   "....#.",
+   "...#..",
+   "..#...",
+   ".#....",
+   "......",
+   "......"}
+ );
+});
+Test test_a1_task2_breadth_pos_small("a1.task2.breadth.pos.small", []() {
+ check_line_covers(
+  "line with slope 0<=m<=1",
+  { Vec2(0.5f, 0.5f), Vec2(8.0f, 2.0f) },
+  {"...#####",
+   "###....."}
+ );
+});
+Test test_a1_task2_breadth_pos_large("a1.task2.breadth.pos.large", []() {
+ check_line_covers(
+  "line with slope m>1 and swap",
+  { Vec2(2.0f, 4.5f), Vec2(0.1f, 0.25f) },
+  {"...",
+   "..#",
+   ".#.",
+   ".#.",
+   "#..",
+   "#.."}
+ );
+});
+Test test_a1_task2_breadth_neg_small("a1.task2.breadth.neg.small", []() {
+ check_line_covers(
+  "line with slope -1 <= m <= 0",
+  { Vec2(0.5f, 3.5f), Vec2(6.5f, 0.5f) },
+  {"##....",
+   "..##..",
+   "....##",
+   "......"}
+ );
+});
+Test test_a1_task2_breadth_neg_large("a1.task2.breadth.neg.large", []() {
+ check_line_covers(
+  "line with slope -1<m",
+  { Vec2(1.1f, 5.9f), Vec2(2.75f, 2.1f) },
+  {".#.",
+   ".#.",
+   "..#",
+   "..#",
+   "...",
+   "..."}
+ );
+});
+
+// More edge cases based on order because it matters apparently
+
+Test test_a1_task2_order_valid1("a1.task2.order.valid1", []() {
+ check_line_covers(
+  "direct opposite of a1.task2.single.invalid.left, but DOES emit pixel",
+  { Vec2(1.0f, 1.5f), Vec2(1.875f, 1.875f) },
+  {".#.",
+   "..."}
+ );
+});
+
+Test test_a1_task2_order_valid2("a1.task2.order.valid2", []() {
+ check_line_covers(
+  "similar to a1.task2.order.valid1 but starting point is on the right half to make sure you don't have weird heuristics",
+  { Vec2(1.6f, 1.45f), Vec2(1.875f, 1.875f) },
+  {".#.",
+   "..."}
+ );
+});
+
+Test test_a1_task2_order_valid_incl_incl("a1.task2.order.valid.inclusive-inclusive", []() {
+ check_line_covers(
+  "inclusive start and end point - line exits the start diamond (even though it starts inside) and end diamond",
+  { Vec2(0.6f, 0.5f), Vec2(4.875f, 2.875f) },
+  {"...##",
+   "..#..",
+   "##..."} 
+ );
+});
+
+Test test_a1_task2_order_valid_incl_excl("a1.task2.order.valid.inclusive-exclusive", []() {
+ check_line_covers(
+  "swapped endpts of above - inclusive start and exclusive end point - line exits the start diamond but doesn't exit the end diamond",
+  { Vec2(4.875f, 2.875f), Vec2(0.6f, 0.5f) },
+  {"...##",
+   "..#..",
+   ".#..."}
+ );
+});
+
+// start and end at corners (no 45 deg tests though)
+// a1.task2.breadth.pos.large already implicitly checks for starting at left corner
+Test test_a1_task2_corner_left_end("a1.task2.corner.left.end", []() {
+ check_line_covers(
+  "ending at left corner = no emit",
+  { Vec2(0.0f, 1.0f), Vec2(0.0f, 0.5f) },
+  {"..."}
+ );
+});
+
+Test test_a1_task2_corner_top_start("a1.task2.corner.top.start", []() {
+ check_line_covers(
+  "starting 'outside' = no emit where you think it should but it does emit",
+  { Vec2(0.5f, 1.0f), Vec2(1.0f, 1.0f) },
+  {"#..",
+   "..."}
+ );
+});
+// ending at top corner depends on start case sooo I'll exclude this case for now
+Test test_a1_task2_corner_right_start("a1.task2.corner.right.start", []() {
+ check_line_covers(
+  "starting 'outside' = no emit where you think it should but it does emit",
+  { Vec2(1.0f, 0.5f), Vec2(1.0f, 1.0f) },
+  {".#."}
+ );
+});
+// ending at top corner depends on start case sooo I'll exclude this case for now
+Test test_a1_task2_corner_bottom_start("a1.task2.corner.bottom.start", []() {
+ check_line_covers(
+  "starting at bottom corner => emit because it immediately leaves (depending on endpt tho)",
+  { Vec2(0.5f, 0.0f), Vec2(0.0f, 0.0f) },
+  {"#.."}
+ );
+});
+Test test_a1_task2_corner_bottom_start_invalid("a1.task2.corner.bottom.start.invalid", []() {
+ check_line_covers(
+  "starting at bottom corner => no emit because endpt is within diamond",
+  { Vec2(0.5f, 0.0f), Vec2(0.3f, 0.6f) },
+  {"..."}
+ );
+});
+Test test_a1_task2_corner_bottom_end("a1.task2.corner.bottom.end", []() {
+ check_line_covers(
+  "ending at bottom corner = no emit",
+  { Vec2(0.0f, 1.0f), Vec2(0.5f, 0.0f) },
+  {"..."}
+ );
+}); 

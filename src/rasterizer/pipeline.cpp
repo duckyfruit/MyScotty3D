@@ -324,7 +324,7 @@ void Pipeline<p, P, flags>::clip_triangle(
  * 
  *        (x+0.5,y+1)
  *        /        \
- *    (x,y+0.5)  (x+1,y+0.5)
+ *   (x,y+0.5) -  (x+1,y+0.5)
  *        \        /
  *         (x+0.5,y)
  *
@@ -352,6 +352,7 @@ template<PrimitiveType p, class P, uint32_t flags>
 void Pipeline<p, P, flags>::rasterize_line(
 	ClippedVertex const& va, ClippedVertex const& vb,
 	std::function<void(Fragment const&)> const& emit_fragment) {
+		//inputs include emit_fragment function, clippedvertex va & vb where va and vb are endpoints
 	if constexpr ((flags & PipelineMask_Interp) != Pipeline_Interp_Flat) {
 		assert(0 && "rasterize_line should only be invoked in flat interpolation mode.");
 	}
@@ -361,14 +362,404 @@ void Pipeline<p, P, flags>::rasterize_line(
 	// this function!
 	// The OpenGL specification section 3.5 may also come in handy.
 
-	{ // As a placeholder, draw a point in the middle of the line:
-		//(remove this code once you have a real implementation)
-		Fragment mid;
-		mid.fb_position = (va.fb_position + vb.fb_position) / 2.0f;
-		mid.attributes = va.attributes;
-		mid.derivatives.fill(Vec2(0.0f, 0.0f));
-		emit_fragment(mid);
+
+	//goal: draw the entire line from va to vb
+	//first: pick a major axis
+
+	/* --------  VARIABLES -------*/
+	bool majorAxisX = true; //major axis variable
+ 
+	float vaX = va.fb_position.x; //va.x
+	float vaY = va.fb_position.y; //va.y
+	float vaZ = va.fb_position.z; //va.z
+
+	float vbX = vb.fb_position.x; //vb.x
+	float vbY = vb.fb_position.y; //vb.y
+	float vbZ = vb.fb_position.z; //vb.z
+
+	float vaXO = va.fb_position.x; //va.x original
+	float vaYO = va.fb_position.y; //va.y original
+	float vbXO = vb.fb_position.x; //vb.x original
+	float vbYO = vb.fb_position.y; //vb.y original
+
+	float s1 = (vbY - vaY) / (vbX - vaX);  //s1 of the line between x and y
+	float s2 = (vbY - vaY) / (vbZ - vaZ); //s2 of the line between y and z
+	float s3 =  (vbX - vaX) / (vbZ - vaZ); //s3 of the line between x and z
+
+	float b1 = vaY - s1 * vaX; //intercept of the line for x and y
+	float b2 = vaY - s2 * vaZ; //intercept of the line for y and z
+	float b3 = vaX - s3 * vaZ; //intercept of the line for x and z
+
+	float w; // for calculations later
+	float v; //for calculations later
+	Fragment shade; //the shade fragment
+
+	/* --------  VARIABLES -------*/
+
+
+
+	/* ----------- HELPER FUNCTIONS --------------*/
+
+   auto shadePixel = [&] (float x, float y, float z)
+    {
+		shade.fb_position.x = floor(x) + 0.5f; //the shaded pixel x position
+        shade.fb_position.y = floor(y) + 0.5f; //the shaded pixel y position
+		shade.fb_position.z = floor(z) + 0.5f; //the shaded pixel z position
+		shade.attributes = va.attributes; //take the attributes of va 
+		shade.derivatives.fill(Vec2(0.0f, 0.0f)); //and do derivatives fill?
+		emit_fragment(shade); //and call the function
+    };
+
+	auto endDiamondPoint = [&] (float x, float y, float z, bool majorAxis, float i, float j)
+	{
+		float xPcoor = x - floor(x); //calculate the pixel x corr from 0 - 1
+		float yPcoor = y - floor(y); //calculate the pixel y corr from 0 - 1
+
+
+		if(abs(x - i) <= 1.0f && abs(y - j) <= 1.0f) //if the other two coordinates are within the pixel, check whether they are in the other quadrants
+		{	return; }
+
+		
+			if(xPcoor == 0.5f && yPcoor == 0.0f) //Case 1: bottom diamond point
+			{ return; } //shade the pixel 
+			else if (xPcoor == 0.0f && yPcoor == 0.5f) //Case 2:left diamond point
+			{ return; } //shade the pixel 
+			else if(xPcoor <= 0.5f && yPcoor <= 0.5f)//Case 3: if it is in the 3rd quadrant
+			{ 
+				if(yPcoor >= (-xPcoor + 0.5f)) // if it is inside the diamond
+				{ return; } //shade pixel
+				if(majorAxis)
+				{
+					if(vbX < vaX) //if the endpoint is less than the startpoint
+					{shadePixel(x, y, z); } //shade pixel		
+				} //shade pixel
+				else
+				{
+					if(vbY < vaY) //if the edpoint is less than the startpoints
+					{shadePixel(x, y, z); } //shade pixel
+				}
+				
+			} //shade the pixel  
+			else if(xPcoor <= 0.5f && yPcoor >= 0.5f) //Case 4: if it is in the 2nd quadrant
+			{
+				if(yPcoor <= (xPcoor + 0.5f)) // if it is inside the diamond
+				{ return; } //shade the pixel  
+				if(majorAxis)
+				{
+					if(vbX < vaX)
+					{shadePixel(x, y, z); } //shade pixel		
+				} //shade pixel
+				else
+				{
+					if(vbY > vaY)
+					{shadePixel(x, y, z); } //shade pixel
+				}
+
+			}
+			else if(xPcoor >= 0.5f && yPcoor >= 0.5f) //Case 5: if it is in the 1st quadrant
+			{
+				if(yPcoor <= (-xPcoor + 1.5f)) // if it is inside the diamond
+				{ return; } //do not shade the pixel  
+				if(majorAxis)
+				{
+					if(vbX > vaX)
+					{shadePixel(x, y, z); } //shade pixel		
+				} //shade pixel
+				else
+				{
+					if(vbY > vaY)
+					{shadePixel(x, y, z); } //shade pixel
+				}
+			}
+			else if(xPcoor >= 0.5f && yPcoor <= 0.5f) //Case 6: if it is in the 4th quadrant
+			{
+				if(yPcoor >= (xPcoor - 0.5f)) // if it is inside the diamond
+				{ return; } //do not shade the pixel  
+				if(majorAxis)
+				{ 
+					//check whether the line enters the diamond based on the slope & intercept of the line
+					if(vbX > vaX)
+					{shadePixel(x, y, z); } //shade pixel
+				}  
+				else
+				{
+					if(vbY < vaY)
+					{shadePixel(x, y, z); } //shade pixel
+				}
+			}
+	};
+
+
+   auto beginDiamondPoint = [&] (float x, float y, float z, bool majorAxis, float i, float j)
+    {
+		float xPcoor = x - floor(x); //calculate the pixel x corr from 0 - 1
+		float yPcoor = y - floor(y); //calculate the pixel y corr from 0 - 1
+
+		float iPcoor = i - floor(i); //calculate the pixel x corr from 0 - 1
+		float jPcoor = j - floor(j); //calculate the pixel y corr from 0 - 1
+
+									//check if the other two coordinates are within the pixel 
+		if(((abs(x - i) <= 1.0f) && (floor(x) == floor(i))) && ((abs(y - j) <= 1.0f) && (floor(y) == floor(j)))) //if the other two coordinates are within the pixel, check whether they are in the other quadrants
+		{		
+			if(xPcoor <= 0.5f && yPcoor <= 0.5f)//Case 3: if it is in the 3rd quadrant
+			{ 
+				if(iPcoor <= 0.5f && jPcoor <= 0.5f) //if the other coordinates are in the same quadrant
+				{
+					if(jPcoor >= (-iPcoor + 0.5f)) //if endpoint is inside diamond
+					{return;}
+
+					if(yPcoor >= (-xPcoor + 0.5f)) // if it is inside the diamond
+					{  shadePixel(x, y, z); }
+				}
+				else if((jPcoor <= (iPcoor + 0.5f)) && (iPcoor <= 0.5f && jPcoor >= 0.5f)) // if it is inside the diamond
+				{return;}
+				else if((jPcoor <= (-iPcoor + 1.5f)) && (iPcoor >= 0.5f && jPcoor >= 0.5f)) // if it is inside the diamond
+				{return;}
+				else if((jPcoor >= (iPcoor - 0.5f)) && (iPcoor >= 0.5f && jPcoor <= 0.5f)) // if it is inside the diamond
+				{return;}
+				else
+				{shadePixel(x, y, z);} //shade pixel
+			} //shade the pixel  
+			else if(xPcoor <= 0.5f && yPcoor >= 0.5f) //Case 4: if it is in the 2nd quadrant
+			{
+
+				if(iPcoor <= 0.5f && jPcoor >= 0.5f) //if the other coordinates are in the same quadrant
+				{
+					if(jPcoor <= (iPcoor + 0.5f)) //if endpoint is inside diamond
+					{return;}
+
+					if(yPcoor <= (xPcoor + 0.5f)) // if it is inside the diamond
+					{  shadePixel(x, y, z); }
+					
+				}
+				else if((jPcoor <= (iPcoor + 0.5f)) && (iPcoor <= 0.5f && jPcoor <= 0.5f)) // if it is inside the diamond
+				{return;}
+				else if((jPcoor <= (-iPcoor + 1.5f)) && (iPcoor >= 0.5f && jPcoor >= 0.5f)) // if it is inside the diamond
+				{return;}
+				else if((jPcoor >= (iPcoor - 0.5f)) && (iPcoor >= 0.5f && jPcoor <= 0.5f)) // if it is inside the diamond
+				{return;}
+				else
+				{shadePixel(x, y, z);} //shade pixel
+			}
+			else if(xPcoor >= 0.5f && yPcoor >= 0.5f) //Case 5: if it is in the 1st quadrant
+			{
+				if(iPcoor >= 0.5f && jPcoor >= 0.5f) //if the other coordinates are in the same quadrant
+				{
+					if(jPcoor <= (-iPcoor + 1.5f)) //if endpoint is inside diamond
+					{return;}
+
+					if(yPcoor <= (-xPcoor + 1.5f)) // if it is inside the diamond
+					{  shadePixel(x, y, z); }
+				}
+				else if((jPcoor <= (iPcoor + 0.5f)) && (iPcoor <= 0.5f && jPcoor <= 0.5f)) // if it is inside the diamond
+				{return;}
+				else if((jPcoor <= (iPcoor + 0.5f)) && (iPcoor <= 0.5f && jPcoor >= 0.5f)) // if it is inside the diamond
+				{return;}
+				else if((jPcoor >= (iPcoor - 0.5f)) && (iPcoor >= 0.5f && jPcoor <= 0.5f)) // if it is inside the diamond
+				{return;}
+				else
+				{shadePixel(x, y, z);} //shade pixel
+			}
+			else if(xPcoor >= 0.5f && yPcoor <= 0.5f) //Case 6: if it is in the 4th quadrant
+			{
+				if(iPcoor >= 0.5f && jPcoor <= 0.5f) //if the other coordinates are in the same quadrant
+				{
+					if(jPcoor >= (iPcoor - 0.5f)) //if endpoint is inside diamond
+					{return;}
+
+					if(yPcoor >= (xPcoor - 0.5f)) // if it is inside the diamond
+					{  shadePixel(x, y, z); }
+				}
+				else if((jPcoor <= (iPcoor + 0.5f)) && (iPcoor <= 0.5f && jPcoor <= 0.5f)) // if it is inside the diamond
+				{return;}
+				else if((jPcoor <= (iPcoor + 0.5f)) && (iPcoor <= 0.5f && jPcoor >= 0.5f)) // if it is inside the diamond
+				{return;}
+				else if((jPcoor <= (-iPcoor + 1.5f)) && (iPcoor >= 0.5f && jPcoor >= 0.5f)) // if it is inside the diamond
+				{return;}
+				else
+				{shadePixel(x, y, z);} //shade pixel
+			}
+		}
+		else
+		{
+			if(xPcoor == 0.5f && yPcoor == 0.0f) //Case 1: bottom diamond point
+			{ shadePixel(x, y, z); } //shade the pixel 
+			else if (xPcoor == 0.0f && yPcoor == 0.5f) //Case 2:left diamond point
+			{ shadePixel(x, y, z); } //shade the pixel 
+			else if(xPcoor <= 0.5f && yPcoor <= 0.5f)//Case 3: if it is in the 3rd quadrant
+			{ 
+				if(yPcoor >= (-xPcoor + 0.5f)) // if it is inside the diamond
+				{shadePixel(x, y, z); } //shade pixel
+				//check whether the line enters the diamond based on the slope & intercept of the line
+				if(majorAxis)
+				{
+					if(vbX > vaX) //if the endpoint is less than the startpoint
+					{shadePixel(x, y, z); } //shade pixel		
+				} //shade pixel
+				else
+				{
+					if(vbY > vaY) //if the edpoint is less than the startpoints
+					{shadePixel(x, y, z); } //shade pixel
+				}
+				
+			} //shade the pixel  
+			else if(xPcoor <= 0.5f && yPcoor >= 0.5f) //Case 4: if it is in the 2nd quadrant
+			{
+				if(yPcoor <= (xPcoor + 0.5f)) // if it is inside the diamond
+				{ shadePixel(x, y, z); } //shade the pixel  
+				if(majorAxis)
+				{
+					if(vbX > vaX)
+					{shadePixel(x, y, z); } //shade pixel		
+				} //shade pixel
+				else
+				{
+					if(vbY < vaY)
+					{shadePixel(x, y, z); } //shade pixel
+				}
+
+			}
+			else if(xPcoor >= 0.5f && yPcoor >= 0.5f) //Case 5: if it is in the 1st quadrant
+			{
+				if(yPcoor <= (-xPcoor + 1.5f)) // if it is inside the diamond
+				{ shadePixel(x, y, z); } //shade the pixel  
+				if(majorAxis)
+				{
+					if(vbX < vaX)
+					{shadePixel(x, y, z); } //shade pixel		
+				} //shade pixel
+				else
+				{
+					if(vbY < vaY)
+					{shadePixel(x, y, z); } //shade pixel
+				}
+			}
+			else if(xPcoor >= 0.5f && yPcoor <= 0.5f) //Case 6: if it is in the 4th quadrant
+			{
+				if(yPcoor >= (xPcoor - 0.5f)) // if it is inside the diamond
+				{ shadePixel(x, y, z); } //shade the pixel  
+				if(majorAxis)
+				{ 
+					//check whether the line enters the diamond based on the slope & intercept of the line
+					if(vbX < vaX)
+					{shadePixel(x, y, z); } //shade pixel
+				}  
+				else
+				{
+					if(vbY > vaY)
+					{shadePixel(x, y, z); } //shade pixel
+				}
+			}
+		}
+
+    };
+
+
+	/* ----------- HELPER FUNCTIONS --------------*/
+
+
+	float deltaX = abs(vbX - vaX); // change in X
+	float deltaY = abs(vbY - vaY); //change in Y
+
+	if(deltaX <= deltaY){ majorAxisX = false; } // Y is the Major Axis
+											  // else, X remains the Major Axis
+
+	printf("%d ", majorAxisX);
+	beginDiamondPoint(vaX, vaY, vaZ, majorAxisX, vbX, vbY); //figure out whether to shade the 1st pixel or not
+	endDiamondPoint(vbX, vbY, vbZ, majorAxisX, vaX, vaY); //figure out whether to shade the last pixel or not
+
+	if( majorAxisX == false )
+	{ //if the major Axis was determined to be Y
+
+		if(vaY > vbY) // check if va y is > vb y
+		{ //if so, switch their positions!
+			vaX = vb.fb_position.x; 
+			vaY = vb.fb_position.y;
+			vaZ = vb.fb_position.z;
+
+			vbX = va.fb_position.x;
+			vbY = va.fb_position.y;
+			vbZ = va.fb_position.z;
+			// this one's hard 
+			vaXO = vb.fb_position.x; 
+			vaYO = vb.fb_position.y;
+			vbXO = va.fb_position.x;
+			vbYO = va.fb_position.y;
+
+			//s1 also needs to be updated!
+			
+			s1 = (vbY-vaY) / (vbX - vaX);  //s1 of the line between x and y
+			s2 = (vbY - vaY) / (vbZ - vaZ); //s2 of the line between y and z
+
+			b1 = vaY - s1 * vaX; //intercept of the line for x and y 
+			b2 = vaY - s2 * vaZ; //intercept of the line for y and z
+			
+		}
+		vaY = floor(vaY);
+		vbY = floor(vbY);
+		vaY += 1.0f; //increment to the next pixel Y
+		vaZ = ((vaY - b2 ) / s2); // get the next pixel z
+		//next, draw the line!
+
+		while(vaY < vbY) //while we are still going from the start
+																  //to the end of the line
+		{
+			w = (((vaY + 0.5f) - vaYO ) / (vbYO - vaYO)); 
+			v = (w * (vbXO - vaXO) + vaXO);
+			//calculate w and v with the equations given in the slides
+
+			shadePixel(v, vaY, vaZ); // shade the pixel
+
+			vaY += 1.0f; //increment to the next pixel Y
+			vaZ = ((vaY - b2 ) / s2); // get the next pixel z
+		}  
+
+		//figure out if the endpoint should be shaded or not
+
 	}
+	else 
+	{ //if not, the major Axis is X
+		
+		if(vaX > vbX) // check if va x is > vb x
+		{ //if so, switch their positions!
+			vaX = vb.fb_position.x; 
+			vaY = vb.fb_position.y;
+			vaZ = vb.fb_position.z;
+
+			vbX = va.fb_position.x;
+			vbY = va.fb_position.y;
+			vbZ = va.fb_position.z;
+
+			vaXO = vb.fb_position.x; 
+			vaYO = vb.fb_position.y;
+			vbXO = va.fb_position.x;
+			vbYO = va.fb_position.y;
+			//s1 also needs to be updated!
+			s1 = (vbY-vaY) / (vbX - vaX);  //s1 of the line
+			s3 =  (vbX - vaX) / (vbZ - vaZ); //s2 for z 
+			
+			b1 = vaY - s1 * vaX; //intercept of the line
+			b3 = vaX - s3 * vaZ; //intercept of the line for z
+		}
+		vaX = floor(vaX);
+		vbX = floor(vbX);
+		vaX += 1.0f; //increment to the next pixel X
+		vaZ = (s3 * vaX + b3); // get the next pixel z
+		//next, draw the line!
+
+		while(vaX < vbX) //while we are still going from the start
+																  //to the end of the line
+		{
+			w = (((vaX + 0.5f) - vaXO) / (vbXO - vaXO)); 
+			v = (w * (vbYO - vaYO) + vaYO);
+			//calculate w and v with the equations given in the slides
+			shadePixel(vaX, v, vaZ);
+
+			vaX += 1.0f; //increment to the next pixel X
+			vaZ = (s3 * vaX + b3); // get the next pixel z
+		} 
+		
+	} 
 
 }
 
@@ -418,6 +809,8 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 	//  (e.g., if you break Flat while implementing Correct, you won't get points
 	//   for Flat.)
 	if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Flat) {
+
+		
 		// A1T3: flat triangles
 		// TODO: rasterize triangle (see block comment above this function).
 
