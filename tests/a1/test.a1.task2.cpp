@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <unordered_set>
 
+//Failing the 0.999999 test case? Use doubles over floats -Nico
+
 using TestPipeline = Pipeline< PrimitiveType::Lines, Programs::Lambertian, Pipeline_Blend_Replace | Pipeline_Depth_Less | Pipeline_Interp_Flat >;
 
 namespace std {
