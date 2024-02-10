@@ -135,7 +135,7 @@ void Pipeline<primitive_type, Program, flags>::run(std::vector<Vertex> const& ve
 		// depth test:
 		if constexpr ((flags & PipelineMask_Depth) == Pipeline_Depth_Always) {
 			// "Always" means the depth test always passes.
-			fb_depth = f.fb_position.z;
+			//fb_depth = f.fb_position.z;
 		} else if constexpr ((flags & PipelineMask_Depth) == Pipeline_Depth_Never) {
 			// "Never" means the depth test never passes.
 			continue; //discard this fragment
@@ -384,6 +384,14 @@ void Pipeline<p, P, flags>::rasterize_line(
 	float vaYO = va.fb_position.y; //va.y original
 	float vbXO = vb.fb_position.x; //vb.x original
 	float vbYO = vb.fb_position.y; //vb.y original
+
+	float s1 = (vbY - vaY) / (vbX - vaX);  //s1 of the line between x and y
+	float s2 = (vbY - vaY) / (vbZ - vaZ); //s2 of the line between y and z
+	float s3 =  (vbX - vaX) / (vbZ - vaZ); //s3 of the line between x and z
+
+	float b1 = vaY - s1 * vaX; //intercept of the line for x and y
+	float b2 = vaY - s2 * vaZ; //intercept of the line for y and z
+	float b3 = vaX - s3 * vaZ; //intercept of the line for x and z
 
 	double w; // for calculations later
 	double v; //for calculations later
@@ -659,6 +667,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 	if(deltaX <= deltaY){ majorAxisX = false; } // Y is the Major Axis
 											  // else, X remains the Major Axis
 
+	printf("%d ", majorAxisX);
 	beginDiamondPoint(vaX, vaY, vaZ, majorAxisX, vbX, vbY); //figure out whether to shade the 1st pixel or not
 	endDiamondPoint(vbX, vbY, vbZ, majorAxisX, vaX, vaY); //figure out whether to shade the last pixel or not
 
@@ -679,11 +688,20 @@ void Pipeline<p, P, flags>::rasterize_line(
 			vaYO = vb.fb_position.y;
 			vbXO = va.fb_position.x;
 			vbYO = va.fb_position.y;
-	
+
+			//s1 also needs to be updated!
+			
+			s1 = (vbY-vaY) / (vbX - vaX);  //s1 of the line between x and y
+			s2 = (vbY - vaY) / (vbZ - vaZ); //s2 of the line between y and z
+
+			b1 = vaY - s1 * vaX; //intercept of the line for x and y 
+			b2 = vaY - s2 * vaZ; //intercept of the line for y and z
+			
 		}
 		vaY = floor(vaY);
 		vbY = floor(vbY);
 		vaY += 1.0f; //increment to the next pixel Y
+		vaZ = ((vaY - b2 ) / s2); // get the next pixel z
 		//next, draw the line!
 
 		while(vaY < vbY) //while we are still going from the start
@@ -693,9 +711,10 @@ void Pipeline<p, P, flags>::rasterize_line(
 			v = (w * (double(vbXO) - double(vaXO)) + double(vaXO));
 			//calculate w and v with the equations given in the slides
 
-			shadePixel(float(floor(v)), vaY, (vaZ + vbZ)/2.0f); // shade the pixel
+			shadePixel(float(floor(v)), vaY, vaZ); // shade the pixel
 
 			vaY += 1.0f; //increment to the next pixel Y
+			vaZ = ((vaY - b2 ) / s2); // get the next pixel z
 		}  
 
 		//figure out if the endpoint should be shaded or not
@@ -718,12 +737,17 @@ void Pipeline<p, P, flags>::rasterize_line(
 			vaYO = vb.fb_position.y;
 			vbXO = va.fb_position.x;
 			vbYO = va.fb_position.y;
-		
-
+			//s1 also needs to be updated!
+			s1 = (vbY-vaY) / (vbX - vaX);  //s1 of the line
+			s3 =  (vbX - vaX) / (vbZ - vaZ); //s2 for z 
+			
+			b1 = vaY - s1 * vaX; //intercept of the line
+			b3 = vaX - s3 * vaZ; //intercept of the line for z
 		}
 		vaX = floor(vaX);
 		vbX = floor(vbX);
 		vaX += 1.0f; //increment to the next pixel X
+		vaZ = (s3 * vaX + b3); // get the next pixel z
 		//next, draw the line!
 
 		while(vaX < vbX) //while we are still going from the start
@@ -732,9 +756,10 @@ void Pipeline<p, P, flags>::rasterize_line(
 			w = (((double(vaX) + 0.5) - double(vaXO)) / (double(vbXO) - double(vaXO))); 
 			v = (w * (double(vbYO) - double(vaYO)) + double(vaYO));
 			//calculate w and v with the equations given in the slides
-			shadePixel(vaX, float(floor(v)), (vaZ + vbZ)/2.0f);
+			shadePixel(vaX, float(floor(v)), vaZ);
 
 			vaX += 1.0f; //increment to the next pixel X
+			vaZ = (s3 * vaX + b3); // get the next pixel z
 		} 
 		
 	} 
