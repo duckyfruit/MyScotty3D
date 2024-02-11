@@ -136,11 +136,16 @@ void Pipeline<primitive_type, Program, flags>::run(std::vector<Vertex> const& ve
 		if constexpr ((flags & PipelineMask_Depth) == Pipeline_Depth_Always) {
 			// "Always" means the depth test always passes.
 			//fb_depth = f.fb_position.z;
+			fb_depth = f.fb_position.z;
 		} else if constexpr ((flags & PipelineMask_Depth) == Pipeline_Depth_Never) {
 			// "Never" means the depth test never passes.
 			continue; //discard this fragment
 		} else if constexpr ((flags & PipelineMask_Depth) == Pipeline_Depth_Less) {
-			fb_depth = f.fb_position.z;
+			
+			if(fb_depth > f.fb_position.z)
+			{fb_depth = f.fb_position.z;}
+			else 
+			{continue;}
 
 			// "Less" means the depth test passes when the new fragment has depth less than the stored depth.
 			// A1T4: Depth_Less
@@ -667,7 +672,6 @@ void Pipeline<p, P, flags>::rasterize_line(
 	if(deltaX <= deltaY){ majorAxisX = false; } // Y is the Major Axis
 											  // else, X remains the Major Axis
 
-	printf("%d ", majorAxisX);
 	beginDiamondPoint(vaX, vaY, vaZ, majorAxisX, vbX, vbY); //figure out whether to shade the 1st pixel or not
 	endDiamondPoint(vbX, vbY, vbZ, majorAxisX, vaX, vaY); //figure out whether to shade the last pixel or not
 
@@ -898,7 +902,7 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 					topRule(By, Ay, Cy, x, y);
 				}
 				else
-				{shadePixel(x, y, (vaZ + vbZ + vcZ)/ 3.0f);}
+				{shadePixel(x, y, (vaZ + vbZ + vcZ)/ 3.0f);} //I don't know how else to get the z value
 			}
 		};		
 
@@ -1027,9 +1031,9 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 		for(float j = floor(y1); j <= floor(y2); j+= 1.0f) //go through from y1 -> y2
 		{
 			if(orientation(vaX, vaY, vbX, vbY, vcX, vcY)) //if the triangle is going clockwise
-			{pointInside(vaX, vaY, vcX, vcY, vbX, vbY, floor(i) + 0.5f, floor(j) + 0.5f);}
+			{pointInside(vaX, vaY, vcX, vcY, vbX, vbY, floor(i) + 0.5f, floor(j) + 0.5f);} //flip points 2 and 3
 			else //if the triangle is going counter clockwise
-			{pointInside(vaX, vaY, vbX, vbY, vcX, vcY, floor(i) + 0.5f, floor(j) + 0.5f);}
+			{pointInside(vaX, vaY, vbX, vbY, vcX, vcY, floor(i) + 0.5f, floor(j) + 0.5f);} //keep points 2 and 3
 		}
 	}
 
@@ -1044,6 +1048,8 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 		Pipeline<PrimitiveType::Lines, P, flags>::rasterize_line(vb, vc, emit_fragment);
 		Pipeline<PrimitiveType::Lines, P, flags>::rasterize_line(vc, va, emit_fragment); */
 	} else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Smooth) {
+
+		
 		// A1T5: screen-space smooth triangles
 		// TODO: rasterize triangle (see block comment above this function).
 
