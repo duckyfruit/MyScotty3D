@@ -19,6 +19,8 @@ std::vector<SamplePattern> const& SamplePattern::all_patterns() {
 
 	// A1T7: sample pattern
 	auto CreateYourOwnSamplePattern = []() {
+
+
 		// TODO: Create your own Sample Pattern
 		// Make any (literally any) SamplePattern that isn't one of the existing ones provided:
 		// ("Center", "Grid 2x2", "Grid 4x4", "Grid 8x8").
@@ -32,7 +34,14 @@ std::vector<SamplePattern> const& SamplePattern::all_patterns() {
 		const uint32_t id = 0;
 		const std::string name = "Custom Sample Pattern";
 		// This will cause it to segfault when used, so be sure to change it!
-		std::vector<Vec3> centers_and_weights = {};
+		std::vector<Vec3> centers_and_weights;
+
+		centers_and_weights.emplace_back(0.5f, 0.5f, 1.0f);
+		centers_and_weights.emplace_back(0.0f, 0.0f, 0.0f);
+		centers_and_weights.emplace_back(0.0f, 1.0f, 0.0f);
+		centers_and_weights.emplace_back(1.0f, 0.0f, 0.0f);
+		centers_and_weights.emplace_back(1.0f, 1.0f, 0.0f);
+
 		return SamplePattern(id, name, centers_and_weights);
 	};
 	static std::vector<SamplePattern> all = [&]() {

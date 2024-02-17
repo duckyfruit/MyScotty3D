@@ -64,7 +64,7 @@ Test test_a1_task7_resolve("a1.task7.resolve", []() {
 	SamplePattern pattern(SamplePattern::CustomBit | 777, "just some other test pattern", std::vector< Vec3 >{
 		Vec3(0.1f, 0.1f, 0.3f),
 		Vec3(0.2f, 0.2f, 0.7f),
-		Vec3(0.3f, 0.3f, 0.0f),
+		Vec3(0.3f, 0.3f, 0.0f), 
 	});
 
 	Framebuffer fb(2, 2, pattern);

@@ -26,15 +26,138 @@ Spectrum sample_bilinear(HDR_Image const &image, Vec2 uv) {
 	// A1T6: sample_bilinear
 	//TODO: implement bilinear sampling strategy on texture 'image'
 
-	return sample_nearest(image, uv); //placeholder so image doesn't look blank
+	//clamp texture coordinates, convert to [0,w]x[0,h] pixel space:
+	float x = image.w * std::clamp(uv.x, 0.0f, 1.0f);
+	float y = image.h * std::clamp(uv.y, 0.0f, 1.0f); //at 1.5 3.0
+
+	//printf("%f %f\n" , x, y);
+
+	int floorx = (int)(floor(x-0.5f)); //x'
+	int floory = (int)(floor(y-0.5f)); //y'
+	
+	int floorxincr = (int)(floorx + 1);
+
+	int flooryincr = (int)(floory + 1);
+
+	float deltax = abs(x - (floorx + 0.5f)); // change in x
+	float deltay = abs(y - (floory + 0.5f)); // change in y
+
+
+	if((floorxincr == (int)(image.w) )|| (flooryincr == (int)(image.h)) )
+	{
+		if((floorxincr == (int)(image.w)))
+		{ 
+			floorxincr = floorx;
+		}
+		if((flooryincr == (int)(image.h)))
+		{ 
+			flooryincr = floory; 
+		}
+			
+	}
+	if(floorx < 0 || floory < 0)
+	{
+		if((floorx < 0))
+		{ 
+			floorx = 0;
+		}
+		if((floory < 0))
+		{ 
+			floory = 0;
+		}
+
+	}
+
+	auto t1 = image.at(floorx,floory); //texture lookups of x, y x+1, y  x, y+1 x+1, y+1
+	auto t2 = image.at(floorxincr,floory); //texture lookups of x, y x+1, y  x, y+1 x+1, y+1
+	auto t3 = image.at(floorx,flooryincr); //texture lookups of x, y x+1, y  x, y+1 x+1, y+1
+	auto t4 = image.at(floorxincr,flooryincr); //texture lookups of x, y x+1, y  x, y+1 x+1, y+1
+	//printf("%d %d\n" , floorx, floory);
+
+	//printf("%d %d\n" , floorxincr, flooryincr);
+
+	
+
+	//printf("%f %f\n" , deltax, deltay);
+
+	
+	//auto t2 = image.at(floorxincr, floory);
+	//auto t3 = image.at(floorx , flooryincr);
+	//auto t4 = image.at(floorxincr, flooryincr);
+
+	std::string test = to_string(t1);
+	std::string test2 = to_string(t2);
+	std::string test3 = to_string(t3);
+	std::string test4 = to_string(t4);
+	/*printf(" t1: %s\n",test.c_str());
+	printf(" t2: %s\n",test2.c_str());
+	printf(" t3: %s\n",test3.c_str());
+	printf(" t4: %s\n",test4.c_str()); */
+
+	Spectrum tx;
+	Spectrum ty;
+
+
+	tx = (1.0f - deltax) * t1 + deltax * t2;
+	ty = (1.0f - deltax) * t3 + deltax * t4;
+ 
+
+	std::string testx = to_string(tx);
+	std::string testy = to_string(ty);
+
+	//printf(" tx: %s\n",testx.c_str());
+	//printf(" ty: %s\n",testy.c_str());
+	return (1.0f - deltay) * tx + deltay * ty;
 }
 
 
 Spectrum sample_trilinear(HDR_Image const &base, std::vector< HDR_Image > const &levels, Vec2 uv, float lod) {
 	// A1T6: sample_trilinear
 	//TODO: implement trilinear sampling strategy on using mip-map 'levels'
+	int floord = (int)(floor(lod));
+	int floordincr = (int)(floord + 1);
+	float deltad = abs(lod - floord);
+	Spectrum td;
+	Spectrum td1;
 
-	return sample_nearest(base, uv); //placeholder so image doesn't look blank
+
+	//printf("%d\n" , floord);
+	//printf("%d\n" , floordincr);
+
+	//printf("%d\n" , (int)(levels.size()));
+
+
+	if((floord) >= (int)(levels.size()))
+	{
+		floord = (int)(levels.size());
+		floordincr = floord;
+	}
+
+	if(floord <= 0) //use base case
+	{
+		floord = 0;
+		td = sample_bilinear(base,uv);
+		td1 = sample_bilinear(levels[floord],uv);
+		return ((1.0f - deltad) * td + deltad * td1);
+
+	}
+	else
+	{
+		td = sample_bilinear(levels[floord - 1],uv);
+		td1 = sample_bilinear(levels[floordincr - 1],uv);
+		return ((1.0f - deltad) * td + deltad * td1);
+
+	}
+
+	//printf("%f\n" , uv.x);
+	//printf("%f\n" , uv.y);
+
+	//printf("%d\n" , floord);
+
+	//printf("%f\n" , deltad);
+
+	
+	//return sample_nearest(base, uv); //placeholder so image doesn't look blank
 }
 
 /*
@@ -87,6 +210,38 @@ void generate_mipmap(HDR_Image const &base, std::vector< HDR_Image > *levels_) {
 		//dst is half the size of src in each dimension:
 		assert(std::max(1u, src.w / 2u) == dst.w);
 		assert(std::max(1u, src.h / 2u) == dst.h);
+		Spectrum x1;
+		Spectrum y1;
+		Spectrum x2;
+		Spectrum y2;
+
+		for(int j = 0; j < (int)(src.h); j +=2 )
+		{
+			for(int i = 0; i < (int)(src.w); i+=2)
+			{
+				if((i/2 < (int)(dst.w)) && (j/2 < (int)(dst.h)))
+				{
+					x1 = src.at(i,j);
+					x2 = src.at(i+1,j);
+					y1 = src.at(i,j+1);
+					y2 = src.at(i+1,j+1);
+					dst.at(i/2, j/2) = (x1 + x2 + y1 + y2)/4.0f;
+				}
+
+				/*std::string test = to_string(x1);
+				std::string test2 = to_string(x2);
+				std::string test3 = to_string(y1);
+				std::string test4 = to_string(y2);
+
+				printf(" t2: %s\n",test.c_str());
+				printf(" t2: %s\n",test2.c_str());
+				printf(" t2: %s\n",test3.c_str());
+				printf(" t2: %s\n",test4.c_str()); */
+
+				
+			}
+		}
+
 
 		// A1T6: generate
 		//TODO: Write code to fill the levels of the mipmap hierarchy by downsampling

@@ -92,20 +92,26 @@ void Pipeline<primitive_type, Program, flags>::run(std::vector<Vertex> const& ve
 
 	std::vector<Fragment> fragments;
 
+
+
 	// helper used to put output of rasterization functions into fragments:
 	auto emit_fragment = [&](Fragment const& f) { fragments.emplace_back(f); };
 
+	std::vector< Vec3 > const &samples = framebuffer.sample_pattern.centers_and_weights;
+	for (uint32_t s = 0; s < samples.size(); ++s) { 
+
 	// actually do rasterization:
-	if constexpr (primitive_type == PrimitiveType::Lines) {
-		for (uint32_t i = 0; i + 1 < clipped_vertices.size(); i += 2) {
-			rasterize_line(clipped_vertices[i], clipped_vertices[i + 1], emit_fragment);
+		if constexpr (primitive_type == PrimitiveType::Lines) {
+			for (uint32_t i = 0; i + 1 < clipped_vertices.size(); i += 2) {
+				rasterize_line(clipped_vertices[i], clipped_vertices[i + 1], emit_fragment);
+			}
+		} else if constexpr (primitive_type == PrimitiveType::Triangles) {
+			for (uint32_t i = 0; i + 2 < clipped_vertices.size(); i += 3) {
+				rasterize_triangle(clipped_vertices[i], clipped_vertices[i + 1], clipped_vertices[i + 2], emit_fragment);
+			}
+		} else {
+			static_assert(primitive_type == PrimitiveType::Lines, "Unsupported primitive type.");
 		}
-	} else if constexpr (primitive_type == PrimitiveType::Triangles) {
-		for (uint32_t i = 0; i + 2 < clipped_vertices.size(); i += 3) {
-			rasterize_triangle(clipped_vertices[i], clipped_vertices[i + 1], clipped_vertices[i + 2], emit_fragment);
-		}
-	} else {
-		static_assert(primitive_type == PrimitiveType::Lines, "Unsupported primitive type.");
 	}
 
 	//--------------------------
@@ -705,7 +711,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 		vaY = floor(vaY);
 		vbY = floor(vbY);
 		vaY += 1.0f; //increment to the next pixel Y
-		vaZ = ((vaY - b2 ) / s2); // get the next pixel z
+		//vaZ = ((vaY - b2 ) / s2); // get the next pixel z
 		//next, draw the line!
 
 		while(vaY < vbY) //while we are still going from the start
@@ -715,10 +721,10 @@ void Pipeline<p, P, flags>::rasterize_line(
 			v = (w * (double(vbXO) - double(vaXO)) + double(vaXO));
 			//calculate w and v with the equations given in the slides
 
-			shadePixel(float(floor(v)), vaY, vaZ); // shade the pixel
+			shadePixel(float(floor(v)), vaY, floor(vaZ)); // shade the pixel
 
 			vaY += 1.0f; //increment to the next pixel Y
-			vaZ = ((vaY - b2 ) / s2); // get the next pixel z
+			//vaZ = ((vaY - b2 ) / s2); // get the next pixel z
 		}  
 
 		//figure out if the endpoint should be shaded or not
@@ -751,7 +757,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 		vaX = floor(vaX);
 		vbX = floor(vbX);
 		vaX += 1.0f; //increment to the next pixel X
-		vaZ = (s3 * vaX + b3); // get the next pixel z
+		//vaZ = (s3 * vaX + b3); // get the next pixel z
 		//next, draw the line!
 
 		while(vaX < vbX) //while we are still going from the start
@@ -760,10 +766,10 @@ void Pipeline<p, P, flags>::rasterize_line(
 			w = (((double(vaX) + 0.5) - double(vaXO)) / (double(vbXO) - double(vaXO))); 
 			v = (w * (double(vbYO) - double(vaYO)) + double(vaYO));
 			//calculate w and v with the equations given in the slides
-			shadePixel(vaX, float(floor(v)), vaZ);
+			shadePixel(vaX, float(floor(v)), floor(vaZ));
 
 			vaX += 1.0f; //increment to the next pixel X
-			vaZ = (s3 * vaX + b3); // get the next pixel z
+			//vaZ = (s3 * vaX + b3); // get the next pixel z
 		} 
 		
 	} 
@@ -815,8 +821,6 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 	//  same code paths. Be aware, however, that all of them need to remain working!
 	//  (e.g., if you break Flat while implementing Correct, you won't get points
 	//   for Flat.)
-	if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Flat) {
-
 		//first, make a square that is va-vb x va-vc in area
 
 		//check the points in that area
@@ -825,7 +829,7 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 
 		//if not 
 		/* --------  VARIABLES -------*/
- 
+
 	float vaX = va.fb_position.x; //va.x
 	float vaY = va.fb_position.y; //va.y
 	float vaZ = va.fb_position.z; //va.z
@@ -838,6 +842,15 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 	float vcX = vc.fb_position.x; //vc.x
 	float vcY = vc.fb_position.y; //vc.y
 	float vcZ = vc.fb_position.z; //vc.z
+
+
+	std::array< float, FA > attror; //create an attribute array
+	std::array< float, FA > attrup; //create an attribute array
+	std::array< float, FA > attrigh; //create an attribute array
+
+	float z = 0.0f; //z value of the pixel 
+	float aTri = 0.0f; //area of
+	int type = 0;
 
 	float x1 = 0.0f; //horz values for translating bounding box
 	float x2 = 0.0f;
@@ -856,57 +869,8 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 
 		auto crossProduct = [&](float x, float y, float a, float b) //calculate the cross product
 		{ return float(x*b - y*a); };
-		auto shadePixel = [&](float x, float y, float z)
-		{
-			shade.fb_position.x = floor(x) + 0.5f; //the shaded pixel x position
-			shade.fb_position.y = floor(y) + 0.5f; //the shaded pixel y position
-			shade.fb_position.z = floor(z) + 0.5f; //the shaded pixel z position
-			shade.attributes = va.attributes; //take the attributes of va 
-			shade.derivatives.fill(Vec2(0.0f, 0.0f)); //and do derivatives fill?
-			emit_fragment(shade); //and call the function
-		};
 
-		auto topRule = [&] (float Ay, float By, float Cy, float x, float y)
-		{
-			if((Ay == By) && (Ay > Cy))
-			{shadePixel(x, y, (vaZ + vbZ + vcZ)/ 3.0f);}
-		};
-
-		auto leftRule = [&] (float Ay, float Bx, float By, float Cx, float x, float y)
-		{
-			if((Ay < By) && (Bx <= Cx))
-			{shadePixel(x, y, (vaZ + vbZ + vcZ)/ 3.0f);}
-
-		};
-
-		auto pointInside = [&](float Ax, float Ay, float Bx, float By, float Cx, float Cy, float x, float y) //check if a point is inside the triangle
-		{
-			float check1 = dotProduct(crossProduct(Cx- Ax, Cy - Ay, Bx - Ax, By - Ay ) , crossProduct(Cx - Ax, Cy - Ay, x - Ax, y - Ay)); //ac ab and aq
-			float check2 = dotProduct(crossProduct(Bx- Cx, By - Cy, Ax - Cx, Ay - Cy ) , crossProduct(Bx - Cx, By - Cy, x - Cx, y - Cy));//cb ca and cq
-			float check3 = dotProduct(crossProduct(Ax- Bx, Ay - By, Cx - Bx, Cy - By ) , crossProduct(Ax - Bx, Ay - By, x - Bx, y - By));//cb ca and cq
-			if((check1 >= 0) && (check2 >= 0) && (check3 >= 0))
-			{	
-				if((check1 == 0))
-				{
-					leftRule(Ay, Cx, Cy, Bx, x, y);
-					topRule(Ay, Cy, By, x, y);
-				}
-				else if(check2 == 0)
-				{
-					leftRule(Cy, Bx, By, Ax, x, y);
-					topRule(Cy, By, Ay, x, y);
-				}
-				else if(check3 == 0)
-				{
-					leftRule(By, Ax, Ay, Cx, x, y);
-					topRule(By, Ay, Cy, x, y);
-				}
-				else
-				{shadePixel(x, y, (vaZ + vbZ + vcZ)/ 3.0f);} //I don't know how else to get the z value
-			}
-		};		
-
-		auto longestSide = [&] (float Ax, float Bx, float Cx) //find the side with the largest delta x
+		auto smallX = [&] (float Ax, float Bx, float Cx) //find the side with the largest delta x
 		{
 			float a = abs(Ax - Bx);
 			float b = abs(Bx - Cx);
@@ -916,26 +880,22 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 			{
 				if(Ax < Bx)
 				{
-					x1 = Ax;
-					x2 = Bx;
+					return Ax;
 				}
 				else
 				{
-					x1 = Bx;
-					x2 = Ax;
+					return Bx;
 				}
 			}
 			else if(b >= c && b >= a)
 			{
 				if(Bx < Cx)
 				{
-					x1 = Bx;
-					x2 = Cx;
+					return Bx;
 				}
 				else
 				{
-					x1 = Cx;
-					x2 = Bx;
+					return Cx;
 				}
 
 			}
@@ -943,19 +903,66 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 			{
 				if(Ax < Cx)
 				{
-					x1 = Ax;
-					x2 = Cx;
+					return Ax;
 				}
 				else
 				{
-					x1 = Cx;
-					x2 = Ax;
+					return Cx;
 				}
 			}
 			
 		};
 
-		auto tallestSide = [&] (float Ay, float By, float Cy) //find the side with the largest delta y
+		auto bigX = [&] (float Ax, float Bx, float Cx) //find the side with the largest delta x
+		{
+			float a = abs(Ax - Bx);
+			float b = abs(Bx - Cx);
+			float c = abs(Ax - Cx);
+
+			if(a >= c && a >= b)
+			{
+				if(Ax < Bx)
+				{
+					//sx = Ax;
+					return Bx;
+				}
+				else
+				{
+					//sx = Bx;
+					return Ax;
+				}
+			}
+			else if(b >= c && b >= a)
+			{
+				if(Bx < Cx)
+				{
+					//sx = Bx;
+					return Cx;
+				}
+				else
+				{
+					//sx = Cx;
+					return Bx;
+				}
+
+			}
+			else 
+			{
+				if(Ax < Cx)
+				{
+					//sx = Ax;
+					return Cx;
+				}
+				else
+				{
+					//sx = Cx;
+					return Ax;
+				}
+			}
+			
+		};
+
+		auto smallY = [&] (float Ay, float By, float Cy) //find the side with the largest delta y
 		{
 			float a = abs(Ay - By);
 			float b = abs(By - Cy);
@@ -965,104 +972,301 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 			{
 				if(Ay < By)
 				{
-					y1 = Ay;
-					y2 = By;
+					return Ay;
 				}
 				else
 				{
-					y1 = By;
-					y2 = Ay;
+					return By;
 				}
 			}
 			else if(b >= c && b >= a)
 			{
 				if(By < Cy)
 				{
-					y1 = By;
-					y2 = Cy;
+					return By;
 				}
 				else
 				{
-					y1 = Cy;
-					y2 = By;
+					return Cy;
 				}
 			}
 			else 
 			{
 				if(Cy < Ay)
 				{
-					y1 = Cy;
-					y2 = Ay;
+					return Cy;
 				}
 				else
 				{
-					y1 = Ay;
-					y2 = Cy;
+					return Ay;
 				}
 			}
 		};
 
-		auto orientation = [&] (float Ax, float Ay, float Bx, float By, float Cx, float Cy) //returns true for clockwise false for counter clockwise
+		auto bigY = [&] (float Ay, float By, float Cy) //find the side with the largest delta y
 		{
-			if(Ax < Bx)
+			float a = abs(Ay - By);
+			float b = abs(By - Cy);
+			float c = abs(Ay - Cy);
+
+			if(a >= c && a >= b)
+			{
+				if(Ay < By)
+				{
+					return By;
+				}
+				else
+				{
+					return Ay;
+				}
+			}
+			else if(b >= c && b >= a)
 			{
 				if(By < Cy)
-				{return false;} //counter clockwise
+				{
+					return Cy;
+				}
 				else
-				{ return true;} //clockwise
+				{
+					return By;
+				}
 			}
-			else
+			else 
 			{
-				if(By >= Cy)
-				{return false;} //counter clockwise
+				if(Cy < Ay)
+				{
+					return Ay;
+				}
 				else
-				{ return true;} //clockwise
+				{
+					return Cy;
+				}
 			}
+		}; 
+
+		auto weight = [&](float x, float y, float Ax, float Ay, float Bx, float By, float Cx, float Cy)
+		{
+			
+			aTri = (Cx *(Ay - By) + Ax * (By - Cy) + Bx * (Cy - Ay) ) /2.0f;
+			float iTri = (x *(Ay - By) + Ax * (By - y) + Bx * (y - Ay)) /2.0f;
+
+			return iTri/aTri;
 
 		};
+
+		auto barw = [&](float x, float y, float Ax, float Ay, float Az, float Bx, float By, float Bz, float Cx, float Cy, float Cz) //obtain the z value with barycentric coor
+		{
+			
+			float phi = weight(x, y, Ax, Ay, Bx, By, Cx, Cy);
+			float phj = weight(x, y, Bx, By, Cx, Cy, Ax, Ay);
+			float phk = weight(x, y, Cx, Cy, Ax, Ay, Bx, By );
+			return (phi * Cz + phj * Az + phk * Bz);
+
+		};
+
+		auto calcDerv = [&](float x, float y, float Ax, float Ay, float Az, float Bx, float By, float Bz, float Cx, float Cy, float Cz)
+		{
+			if(type == 0 )
+			{
+				shade.attributes = va.attributes;
+				shade.derivatives.fill(Vec2(0.0f, 0.0f));
+				
+			}
+			else 
+			{
+				float xincr = x + 1.0f; //the increase to the right
+				float yincr = y + 1.0f; //the increase up
+
+				//now that we have all of the weights, we need to get the U V coordinates for derivative
+				//which is in the attributes of the pixel
+				float ork = weight(x, y, Ax, Ay, Bx, By, Cx, Cy); //bar for original pixel
+				float ori = weight(x, y, Bx, By, Cx, Cy, Ax, Ay); 
+				float orj = weight(x, y, Cx, Cy, Ax, Ay, Bx, By ); 
+
+				float upk = weight(x, yincr, Ax, Ay, Bx, By, Cx, Cy ); //bar for upper pixel 
+				float upi = weight(x, yincr, Bx, By, Cx, Cy, Ax, Ay ); 
+				float upj = weight(x, yincr, Cx, Cy, Ax, Ay, Bx, By ); 
+
+				float rk = weight(xincr, y, Ax, Ay, Bx, By, Cx, Cy ); //bar for right pixel
+				float ri = weight(xincr, y, Bx, By, Cx, Cy , Ax, Ay); 
+				float rj = weight(xincr, y, Cx, Cy, Ax, Ay, Bx, By ); 
+
+				for(int i = 0; i < va.attributes.size(); i++)
+				{
+					attrup[i] = upi* va.attributes[i] + upj * vb.attributes[i] + upk* vc.attributes[i]; //weighted attributes for upper pixel
+					attrigh[i] = ri* va.attributes[i] + rj * vb.attributes[i] + rk* vc.attributes[i]; //weighted attributes for right pixel
+				}
+
+
+				if(type == 1) //smooth shading
+				{
+					for(int i = 0; i < va.attributes.size(); i++)
+					{
+						attror[i] = ori* va.attributes[i] + orj * vb.attributes[i] + ork* vc.attributes[i]; //weighted attributes for original pixel
+						shade.derivatives[i] = Vec2(attrigh[i] - attror[i], attrup[i] - attror[i]); //right pixel - original, up pixel - original
+					}
+					shade.attributes = attror; //shade attributes for original pixel = attror
+				}
+				else //corect shading
+				{
+					float zintror = ori*(va.inv_w )+ orj * (vb.inv_w) + ork* (vc.inv_w); //calculated z interp with invw  for original pixel
+
+					float zintrup = upi*(va.inv_w )+ upj * (vb.inv_w) + upk* (vc.inv_w); //calculated z interp with invw for up pixel
+
+					float zintrigh = ri*(va.inv_w )+ rj * (vb.inv_w) + rk* (vc.inv_w); //calculated z interp with invw for righ pixel
+
+					for(int i = 0; i < va.attributes.size(); i++)
+					{  
+						float pintr = ori*(va.attributes[i] * va.inv_w ) + orj * (vb.attributes[i] * vb.inv_w) + ork* (vc.attributes[i] * vc.inv_w); 
+						float pintrup = upi*(va.attributes[i] * va.inv_w ) + upj * (vb.attributes[i] * vb.inv_w) + upk* (vc.attributes[i] * vc.inv_w); 
+						float pintrigh = ri*(va.attributes[i] * va.inv_w ) + rj * (vb.attributes[i] * vb.inv_w) + rk* (vc.attributes[i] * vc.inv_w); 
+						attror[i] = pintr/zintror;
+						attrup[i] = pintrup/zintrup;
+						attrigh[i] = pintrigh/zintrigh;
+						shade.derivatives[i] = Vec2(attrigh[i] - attror[i], attrup[i] - attror[i]);
+					}
+					shade.attributes = attror;
+				}
+			}
+			//calculate the derivitive of the points!
+
+			//use barw to get the barycentric coordinates, then input them 
+		}; 
+
+		auto shadePixel = [&](float x, float y, float z)
+		{
+			shade.fb_position.x = floor(x) + 0.5f; //the shaded pixel x position
+			shade.fb_position.y = floor(y) + 0.5f; //the shaded pixel y position
+			shade.fb_position.z = z; //the shaded pixel z position
+			emit_fragment(shade); //and call the function
+		};
+
+		
+
+		auto topRule = [&] (float Ax, float Ay, float Bx, float By,float Cx, float Cy)
+		{
+			return((Ay == By) && (Ay > Cy));
+		};
+
+		auto leftRule = [&] (float Ax, float Ay, float Bx, float By, float Cx, float Cy)
+		{
+			return((Ay < By) && (Bx <= Cx));
+		
+		};
+
+		auto pointInside = [&](float Ax, float Ay, float Az, float Bx, float By, float Bz, float Cx, float Cy, float Cz, float x, float y, float z) //check if a point is inside the triangle
+		{
+			z = barw(x, y, Ax, Ay, Az, Bx, By, Bz , Cx, Cy, Cz);
+			float check1 = dotProduct(crossProduct(Cx- Ax, Cy - Ay, Bx - Ax, By - Ay ) , crossProduct(Cx - Ax, Cy - Ay, x - Ax, y - Ay)); //ac ab and aq
+			float check2 = dotProduct(crossProduct(Bx- Cx, By - Cy, Ax - Cx, Ay - Cy ) , crossProduct(Bx - Cx, By - Cy, x - Cx, y - Cy));//cb ca and cq
+			float check3 = dotProduct(crossProduct(Ax- Bx, Ay - By, Cx - Bx, Cy - By ) , crossProduct(Ax - Bx, Ay - By, x - Bx, y - By));//cb ca and cq
+			if((check1 >= 0) && (check2 >= 0) && (check3 >= 0))
+			{	
+				
+				if((check1 == 0))
+				{
+					bool isLeft = leftRule(Cx, Cy, Ax, Ay, Bx, By);
+					bool isTop = topRule(Cx, Cy, Ax, Ay, Bx, By);
+
+					if (isLeft || isTop)
+					{
+						calcDerv(x, y, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz);
+						shadePixel(x, y, z);
+					}
+				}
+				else if(check2 == 0)
+				{
+					bool isLeft = leftRule(Bx, By, Cx, Cy, Ax, Ay);
+					bool isTop = topRule(Bx, By, Cx, Cy,Ax, Ay);
+					if (isLeft || isTop)
+					{
+						calcDerv(x, y, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz);
+						shadePixel(x, y, z);
+					}
+				}
+				else if(check3 == 0)
+				{
+					bool isLeft = leftRule(Ax, Ay, Bx, By, Cx, Cy);
+					bool isTop = topRule(Ax, Ay, Bx, By, Cx, Cy);
+					if (isLeft || isTop)
+					{
+						calcDerv(x, y, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz);
+						shadePixel(x, y, z);
+					}
+				}
+				else
+				{
+					calcDerv(x, y, Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz);
+					shadePixel(x, y, z);
+				} 
+			}
+		};		
 		/* --------  HELPER FUNCTIONS -------*/
 
-	longestSide(vaX, vbX, vcX); //get the longest side
-	tallestSide(vaY, vbY, vcY); //get the tallest side
+	if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Flat) {
+
+	type = 0;
+	x1 = smallX(vaX, vbX, vcX);
+	x2 = bigX(vaX, vbX, vcX);
+	y1 = smallY(vaY, vbY, vcY);
+	y2 = bigY(vaY, vbY, vcY);
 
 	//find longest and tallest side of triangle, make a box with the x and y variables from those sides
 	for(float i = floor(x1); i <= floor(x2); i+= 1.0f) //go through from x1 -> x2
 	{
 		for(float j = floor(y1); j <= floor(y2); j+= 1.0f) //go through from y1 -> y2
 		{
-			if(orientation(vaX, vaY, vbX, vbY, vcX, vcY)) //if the triangle is going clockwise
-			{pointInside(vaX, vaY, vcX, vcY, vbX, vbY, floor(i) + 0.5f, floor(j) + 0.5f);} //flip points 2 and 3
-			else //if the triangle is going counter clockwise
-			{pointInside(vaX, vaY, vbX, vbY, vcX, vcY, floor(i) + 0.5f, floor(j) + 0.5f);} //keep points 2 and 3
+			pointInside(vaX, vaY, vaZ, vbX, vbY, vbZ, vcX, vcY, vcZ, floor(i) + 0.5f, floor(j) + 0.5f, floor(z) + 0.5f); //flip points 2 and 3
 		}
-	}
+	} 
 
 
 
-		// A1T3: flat triangles
-		// TODO: rasterize triangle (see block comment above this function).
-
-		// As a placeholder, here's code that draws some lines:
-		//(remove this and replace it with a real solution)
-		/*Pipeline<PrimitiveType::Lines, P, flags>::rasterize_line(va, vb, emit_fragment);
-		Pipeline<PrimitiveType::Lines, P, flags>::rasterize_line(vb, vc, emit_fragment);
-		Pipeline<PrimitiveType::Lines, P, flags>::rasterize_line(vc, va, emit_fragment); */
 	} else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Smooth) {
 
-		
+	type = 1;
+	x1 = smallX(vaX, vbX, vcX); //longest side 
+	x2 = bigX(vaX, vbX, vcX);
+	y1 = smallY(vaY, vbY, vcY); //tallest side
+	y2 = bigY(vaY, vbY, vcY);
+	//find longest and tallest side of triangle, make a box with the x and y variables from those sides
+	for(float i = floor(x1); i <= floor(x2); i+= 1.0f) //go through from x1 -> x2
+	{
+		for(float j = floor(y1); j <= floor(y2); j+= 1.0f) //go through from y1 -> y2
+		{
+		pointInside(vaX, vaY, vaZ, vbX, vbY, vbZ, vcX, vcY, vcZ, floor(i) + 0.5f, floor(j) + 0.5f, floor(z) + 0.5f); //flip points 2 and 3
+		}
+	} 
+
+
 		// A1T5: screen-space smooth triangles
 		// TODO: rasterize triangle (see block comment above this function).
 
 		// As a placeholder, here's code that calls the Flat interpolation version of the function:
 		//(remove this and replace it with a real solution)
-		Pipeline<PrimitiveType::Lines, P, (flags & ~PipelineMask_Interp) | Pipeline_Interp_Flat>::rasterize_triangle(va, vb, vc, emit_fragment);
+		//Pipeline<PrimitiveType::Lines, P, (flags & ~PipelineMask_Interp) | Pipeline_Interp_Flat>::rasterize_triangle(va, vb, vc, emit_fragment);
 	} else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Correct) {
+		
+	type = 2;
+	x1 = smallX(vaX, vbX, vcX);
+	x2 = bigX(vaX, vbX, vcX);
+	y1 = smallY(vaY, vbY, vcY);
+	y2 = bigY(vaY, vbY, vcY);
+	//find longest and tallest side of triangle, make a box with the x and y variables from those sides
+	for(float i = floor(x1); i <= floor(x2); i+= 1.0f) //go through from x1 -> x2
+	{
+		for(float j = floor(y1); j <= floor(y2); j+= 1.0f) //go through from y1 -> y2
+		{
+			pointInside(vaX, vaY, vaZ, vbX, vbY, vbZ, vcX, vcY, vcZ, floor(i) + 0.5f, floor(j) + 0.5f, floor(z) + 0.5f); //flip points 2 and 3
+		}
+	}	
+		
 		// A1T5: perspective correct triangles
 		// TODO: rasterize triangle (block comment above this function).
 
-		// As a placeholder, here's code that calls the Screen-space interpolation function:
+		// As a placeholder, here's code that calls the Screen-space interpolation function: */
 		//(remove this and replace it with a real solution)
-		Pipeline<PrimitiveType::Lines, P, (flags & ~PipelineMask_Interp) | Pipeline_Interp_Smooth>::rasterize_triangle(va, vb, vc, emit_fragment);
+		//Pipeline<PrimitiveType::Lines, P, (flags & ~PipelineMask_Interp) | Pipeline_Interp_Smooth>::rasterize_triangle(va, vb, vc, emit_fragment);
 	}
 }
 

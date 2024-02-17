@@ -107,13 +107,31 @@ struct Lambertian {
 		Vec3 fa_normal{fa[FA_NormalX], fa[FA_NormalY], fa[FA_NormalZ]};
 
 		// make local names for fragment attribute derivatives:
-		Vec2 fdx_texcoord{fd[FA_TexCoordU].x, fd[FA_TexCoordV].x};
-		Vec2 fdy_texcoord{fd[FA_TexCoordU].y, fd[FA_TexCoordV].y};
+		Vec2 fdx_texcoord{fd[FA_TexCoordU].x, fd[FA_TexCoordV].x}; //uv dx
+		Vec2 fdy_texcoord{fd[FA_TexCoordU].y, fd[FA_TexCoordV].y}; //uv dy
 
 		// size of texture image:
 		[[maybe_unused]] Vec2 wh =
 			Vec2(float(parameters.image->image.w), float(parameters.image->image.h));
 
+		//must make sure UV is inside bounds
+		//
+
+		float x1 = wh[0] * fdx_texcoord[0];
+		float x2 = wh[0] * fdx_texcoord[1];
+		float y1 = wh[1] * fdy_texcoord[0]; //at 1.5 3.0
+		float y2 = wh[1] * fdy_texcoord[1]; //at 1.5 3.0
+		
+		float Lxs = pow(x1,2.0f) + pow(x2,2.0f);
+
+		float Lys = pow(y1,2.0f) + pow(y2,2.0f);
+
+		if(Lxs < 1 && Lys < 1)
+		{Lxs = 1;}
+		
+		float lod =  log2(sqrt(std::max(Lxs, Lys)));
+
+	
 		//-----
 		// A1T6: lod
 		// TODO: compute mip-map level based on size of sample as estimated from derivatives:
@@ -123,7 +141,7 @@ struct Lambertian {
 		// reading onward, you will discover that \rho can be computed in a number of ways
 		//  it is up to you to select one that makes sense in this context
 
-		float lod = 0.0f; //<-- replace this line
+		
 		//-----
 
 		Vec3 normal = fa_normal.unit();
