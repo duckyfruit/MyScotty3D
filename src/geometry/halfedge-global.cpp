@@ -13,6 +13,92 @@
  */
 void Halfedge_Mesh::triangulate() {
 	//A2G1: triangulation
+	//std::unordered_map< VertexCRef, Vec3 > vertex_positions;
+	//std::unordered_map< EdgeCRef, Vec3 > edge_vertex_positions;
+	
+	//loop through all of the faces
+	//std::cout << describe() << std::endl;
+
+	//instead of an iterator, we should put all of the original faces in a list and then go through that
+	for (FaceCRef f = faces.begin(); f != faces.end(); ++f) {
+		//for each face, go through the vertices on that face 
+
+		HalfedgeRef h = f -> halfedge; // halfedge of the face we are on!
+
+		FaceRef pastf = h -> face; //the current face
+
+		if(!(pastf -> boundary))
+		{
+			HalfedgeRef h1 = h->next; //get the next two halfedges as well!
+
+			HalfedgeRef h2 = h1->next; //get the next two halfedges as well!
+
+			HalfedgeRef hpast = h; //the past half edge; this is to keep track and update the mesh
+
+			HalfedgeRef h1past = h1; //the past half edge; this is to keep track and update the mesh
+			
+			while(h2 -> next != h) //if the next halfedge is not the original halfedge
+			{
+				//printf("face!\n");
+				HalfedgeRef h3 = emplace_halfedge(); //create two new halfedges for the edge
+				HalfedgeRef h4 = emplace_halfedge(); 
+				EdgeRef e = emplace_edge(false); //non sharp new edge
+				FaceRef newf = emplace_face(false); //create new face
+												
+				//connect everything
+				e -> halfedge = h3; //give the new edge and face halfedge references
+				newf -> halfedge = h3;
+
+				h3 -> twin = h4; //update the twin halfedges
+				h4 -> twin = h3;
+
+				h3 -> next = hpast; //update the next halfedges
+				h4 -> next = h2;
+
+				h3 -> vertex = h2 -> vertex; //update the vertices
+				h4 -> vertex = h -> vertex;
+				
+				h3 -> edge = e; //update the edges
+				h4 -> edge = e;
+
+				h3 -> face = newf; //update the faces
+				h4 -> face = pastf; //will get updated over with new face
+				
+				//update the old elements!
+				
+				h1past -> next = h3; //the next halfedge of the past h1 halfedge
+				
+				h1 -> face = newf; //the face of the h1 halfedge since a new face was created
+				hpast -> face = newf; //update the past halfedge face 
+
+				hpast = h4; //update hpast for halfedge next
+				h1past = h1;
+				h1 = h2; //move around the shape
+				h2 = h2 -> next; //move around the shape
+			}
+
+			//we need to create a new face from the final edge!
+			h1 -> face = pastf; //reassign all the faces
+			h2 -> face = pastf;
+			hpast -> face = pastf;
+
+			h2 -> next = hpast; //correct the next halfedge
+
+			pastf -> halfedge = h1;
+		}
+	}
+	
+	//triangulate technically complete! 
+
+	
+
+	//start at a point
+
+	//go around the halfedges, count the #of times went around 
+
+	//create a new edge between the vertex of the halfedge 
+
+	//continue until you get back to the original point
 	
 }
 
@@ -32,21 +118,115 @@ void Halfedge_Mesh::linear_subdivide() {
 
 	// For every vertex, assign its current position to vertex_positions[v]:
 
+	for (VertexCRef v = vertices.begin(); v != vertices.end(); ++v) 
+	{vertex_positions[v] = v-> position;}
+
 	//(TODO)
 
     // For every edge, assign the midpoint of its adjacent vertices to edge_vertex_positions[e]:
 	// (you may wish to investigate the helper functions of Halfedge_Mesh::Edge)
+
+	for (EdgeCRef e = edges.begin(); e != edges.end(); ++e) 
+	{
+		//get the edge,
+		//once we have the edge obtain the halfedge
+		//get the twin of the halfedge
+		//that will give the two vertices
+		//from there, you can get the midpoint with the distance formula
+		
+		HalfedgeRef h1 = e->halfedge;
+		HalfedgeRef h2 = h1->twin;
+
+		VertexRef v1 = h1 -> vertex;
+		VertexRef v2 = h2 -> vertex;
+		
+		edge_vertex_positions[e] = (v1 -> position + v2 -> position)/2.0f;
+	}
 
 	//(TODO)
 
     // For every *non-boundary* face, assign the centroid (i.e., arithmetic mean) to face_vertex_positions[f]:
 	// (you may wish to investigate the helper functions of Halfedge_Mesh::Face)
 
+	for (FaceCRef f = faces.begin(); f != faces.end(); ++f)
+	{
+		//to get the centroid of the faces, getg the halfedge of the face
+		//loop around the face until you get back to the halfedge
+		//if it's an even number, get the side oposite, get the midpoints of the edges and then 
+		//the midpoint between those midpoints
+		//if it's an odd number, get the vertex oposite of the halfedge, get the midpoint of the halfedge
+		//and then get the midpoint of the vertices 
+		HalfedgeRef h1 = f -> halfedge; // halfedge of the face we are on!
+		FaceRef currf = h1 -> face; //the current face
+		if(!(currf -> boundary))
+		{
+			HalfedgeRef hloop = h1;
+			HalfedgeRef orig = h1;
+			h1 = h1 -> next;
+			int count = 1;
+
+			while(h1 != orig)
+			{
+				h1 = h1 -> next;
+				count += 1;
+				
+				//std::cout << "testing" << std::endl;
+			}
+			
+
+			if(!(count%2)) //if there are an even amount of edges
+			{
+				//loop  count/2 times, get the midpoints of those edges
+				for(int i = 0; i < count/2; i++)
+				hloop = hloop -> next;
+
+				HalfedgeRef hltwin = hloop -> twin; //get the twins of both halfedges for the vertices
+				HalfedgeRef h1twin = h1 -> twin;
+
+
+				VertexRef v1 = h1 -> vertex; //get the vertices of halfedge h1
+				VertexRef v2 = h1twin -> vertex;
+
+				VertexRef v3 = hloop -> vertex; //get the vertices of halfedge loop
+				VertexRef v4 = hltwin -> vertex;
+
+				
+
+				//calculate the midpoints and then the midpoints of the midpoints
+
+				Vec3 mid  = (v1 -> position + v2 -> position) / 2.0f;
+				Vec3 mid2  = (v3 -> position + v4 -> position) / 2.0f;
+
+				face_vertex_positions[f] = ((mid + mid2) / 2.0f); //should be the centroid
+			}
+			else
+			{
+				//loop around count/2 times, get the 
+				for(int i = 0; i < count/2; i++)
+				hloop = hloop -> next;
+
+				HalfedgeRef h1twin = h1 -> twin;
+
+				VertexRef v1 = h1 -> vertex; //get the vertices of halfedge h1
+				VertexRef v2 = h1twin -> vertex;
+
+				VertexRef v3 = hloop -> vertex; //get the vertices of halfedge loop
+
+				Vec3 mid  = (v1 -> position + v2 -> position) / 2.0f;			
+
+				face_vertex_positions[f] = (mid + v3 -> position) / 2.0f; //should be the centroid
+
+			}
+		}
+
+
+	}
+
 	//(TODO)
 
-
-	//use the helper function to actually perform the subdivision:
 	catmark_subdivide_helper(vertex_positions, edge_vertex_positions, face_vertex_positions);
+	//use the helper function to actually perform the subdivision:
+	
 }
 
 /*
@@ -72,14 +252,164 @@ void Halfedge_Mesh::catmark_subdivide() {
 	// https://en.wikipedia.org/wiki/Catmull%E2%80%93Clark_subdivision_surface
 
 	// Faces
+	std::cout << describe() << std::endl;
+	for (FaceCRef f = faces.begin(); f != faces.end(); ++f)
+	{
+		//to get the centroid of the faces, getg the halfedge of the face
+		//loop around the face until you get back to the halfedge
+		//if it's an even number, get the side oposite, get the midpoints of the edges and then 
+		//the midpoint between those midpoints
+		//if it's an odd number, get the vertex oposite of the halfedge, get the midpoint of the halfedge
+		//and then get the midpoint of the vertices 
+		HalfedgeRef h1 = f -> halfedge; // halfedge of the face we are on!
+		FaceRef currf = h1 -> face; //the current face
+		if(!(currf -> boundary))
+		{
+			HalfedgeRef hloop = h1;
+			HalfedgeRef orig = h1;
+			h1 = h1 -> next;
+			int count = 1;
 
+			while(h1 != orig)
+			{
+				h1 = h1 -> next;
+				count += 1;
+				
+				//std::cout << "testing" << std::endl;
+			}
+			
+
+			if(!(count%2)) //if there are an even amount of edges
+			{
+				//loop  count/2 times, get the midpoints of those edges
+				for(int i = 0; i < count/2; i++)
+				hloop = hloop -> next;
+
+				HalfedgeRef hltwin = hloop -> twin; //get the twins of both halfedges for the vertices
+				HalfedgeRef h1twin = h1 -> twin;
+
+
+				VertexRef v1 = h1 -> vertex; //get the vertices of halfedge h1
+				VertexRef v2 = h1twin -> vertex;
+
+				VertexRef v3 = hloop -> vertex; //get the vertices of halfedge loop
+				VertexRef v4 = hltwin -> vertex;
+
+				
+
+				//calculate the midpoints and then the midpoints of the midpoints
+
+				Vec3 mid  = (v1 -> position + v2 -> position) / 2.0f;
+				Vec3 mid2  = (v3 -> position + v4 -> position) / 2.0f;
+
+				face_vertex_positions[f] = ((mid + mid2) / 2.0f); //should be the centroid
+			}
+			else
+			{
+				//loop around count/2 times, get the 
+				for(int i = 0; i < count/2; i++)
+				hloop = hloop -> next;
+
+				HalfedgeRef h1twin = h1 -> twin;
+
+				VertexRef v1 = h1 -> vertex; //get the vertices of halfedge h1
+				VertexRef v2 = h1twin -> vertex;
+
+				VertexRef v3 = hloop -> vertex; //get the vertices of halfedge loop
+
+				Vec3 mid  = (v1 -> position + v2 -> position) / 2.0f;			
+
+				face_vertex_positions[f] = (mid + v3 -> position) / 2.0f; //should be the centroid
+
+			}
+		}
+
+
+	}
 	// Edges
+	for (EdgeCRef e = edges.begin(); e != edges.end(); ++e) 
+	{
+		//get the edge,
+		//once we have the edge obtain the halfedge
+		//get the twin of the halfedge
+		//from there, you can get the two faces and their point values
+		//you can also get the two verticies and the 
+		//from there, you can get the midpoint with the distance formula
+		
+		HalfedgeRef h1 = e->halfedge; 
+		HalfedgeRef h2 = h1->twin;
 
+		FaceRef f1 = h1 -> face;
+		FaceRef f2 = h2 -> face;
+
+		VertexRef v1 = h1 -> vertex;
+		VertexRef v2 = h2 -> vertex;
+		
+		//check if f2 or f1 is a boundary face
+		if(f1 -> boundary || f2 -> boundary) //if so, just get the midpoint of the edge
+		edge_vertex_positions[e] = (v1 -> position + v2 -> position)/2.0f;
+		else //if not, average the 4 points together
+		edge_vertex_positions[e] = (v1 -> position + v2 -> position + face_vertex_positions[f1] + face_vertex_positions[f2])/4.0f;
+	}
 	// Vertices
 
+	for (VertexCRef v = vertices.begin(); v != vertices.end(); ++v) 
+	{
+		//in order to get all the faces and edges, get the halfedge of the vertex
+		//get the twin of that halfedge and the next halfedge of the twin
+		//get the twin of that halfedge and the next halfedge of the twin
+		//repeat until you loop back to the original halfedge
+		HalfedgeRef h1 = v -> halfedge;
+		HalfedgeRef org = h1; //starting point
+		HalfedgeRef twin = h1 -> twin;
+		FaceRef f = h1 -> face;
+		bool border = false;
+		float count = 0.0f;
+		float num = 0.0f;
+		Vec3 faceAvg = Vec3(0.0f,0.0f,0.0f);
+		Vec3 edgeAvg = Vec3(0.0f,0.0f,0.0f);
+		h1 = h1 -> twin;
+
+		do
+		{
+			f = h1 -> face; //get the face of the halfedge
+			twin = h1 -> twin; //get the twin of the halfedge
+
+			printf(" %d \n", f->boundary);
+
+			if(!((h1 -> face -> boundary)))
+			{
+				num += 1.0f;
+				faceAvg += face_vertex_positions[f]; //add the face midpoint to faceavg
+				edgeAvg +=  (h1 -> vertex -> position + twin -> vertex -> position)/2.0f; //add the edge midpoint to edgeavg
+			}
+			else //if the vertice is on a boundary
+			{
+				vertex_positions[v] = ((v -> position * 0.75f) + (h1 -> vertex -> position * 0.125f) + (h1 -> next -> twin -> vertex -> position * 0.125f));
+				border = true;
+				break;
+			}
+
+			count +=1.0f; //increment n
+			h1 = h1 -> next; //traverse around the vertex
+			h1 = h1 -> twin;
+		} while(h1 != org -> twin);
+
+		printf("%f %f\n", count, num);
+
+		if(!border)
+		{
+			printf("non border!\n");
+			faceAvg = faceAvg / count;
+			edgeAvg = edgeAvg / count;
+			vertex_positions[v] = (faceAvg + 2 * edgeAvg + (count - 3.0f) * v-> position)/count;
+		}
+
+	}
 	
 	//Now, use the provided helper function to actually perform the subdivision:
 	catmark_subdivide_helper(vertex_positions, edge_vertex_positions, face_vertex_positions);
+	std::cout << describe() << std::endl;
 
 }
 
@@ -105,7 +435,7 @@ bool Halfedge_Mesh::loop_subdivide() {
 			return false;
 		}
 	}
-
+	
 	//if execution reaches this point, all non-boundary faces are triangular, so proceed to subdivide:
 
 	// A2Go1: Loop subdivision.
@@ -216,6 +546,7 @@ bool operator<(const Edge_Record& r1, const Edge_Record& r2) {
 	}
 	Halfedge_Mesh::EdgeRef e1 = r1.edge;
 	Halfedge_Mesh::EdgeRef e2 = r2.edge;
+	//std::cout << "meowrrrrrrr" << std::endl;
 	return &*e1 < &*e2;
 }
 

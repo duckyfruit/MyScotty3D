@@ -221,7 +221,112 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::bisect_edge(EdgeRef e) {
  */
 std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(EdgeRef e) {
 	// A2L2 (REQUIRED): split_edge
+
+	//get the halfedges 
+	//get length of edge e, divide by 2, that's where the new vert will be
+	//get the length by using half edge & halfedge twin to get vertices and then distance formula
+	//iterate around the faces next to the vertex and add edges to vertices not next to the vertex
+	//iterate around faces with half edge & half edge twin
+
+	// Phase 0: draw a picture
+	//
+	// before:
+	//    ----h--->
+	// v1 ----e--- v2
+	//   <----t---
+	//
+	// after:
+	//    --h->    --h2->
+	// v1 --e-- vm --e2-- v2
+	//    <-t2-    <--t--
+	//
+
+	// Phase 1: collect existing elements
+	/*HalfedgeRef h = e->halfedge;
+	HalfedgeRef t = h->twin;
+
+	VertexRef v1 = h->vertex;
+	VertexRef v2 = t->vertex;
+
+
+	// Phase 2: Allocate new elements, set data
+	VertexRef vm = emplace_vertex();
+	vm->position = (v1->position + v2->position) / 2.0f;
+	interpolate_data({v1, v2}, vm); //set bone_weights
+
+	EdgeRef e2 = emplace_edge();
+	e2->sharp = e->sharp; //copy sharpness flag
+
+	HalfedgeRef h2 = emplace_halfedge();
+	interpolate_data({h, h->next}, h2); //set corner_uv, corner_normal
+
+	HalfedgeRef t2 = emplace_halfedge();
+	interpolate_data({t, t->next}, t2); //set corner_uv, corner_normal
+
+	// The following elements aren't necessary for the bisect_edge, but they are here to demonstrate phase 4
+    FaceRef f_not_used = emplace_face();
+    HalfedgeRef h_not_used = emplace_halfedge();
+
+	// Phase 3: Reassign connectivity (careful about ordering so you don't overwrite values you may need later!)
+
+	vm->halfedge = h2;
+
+	e2->halfedge = h2;
+
+	assert(e->halfedge == h); //unchanged
+
+	//n.b. h remains on the same face so even if h->face->halfedge == h, no fixup needed (t, similarly)
+
+	h2->twin = t;
+	h2->next = h->next;
+	h2->vertex = vm;
+	h2->edge = e2;
+	h2->face = h->face;
+
+	t2->twin = h;
+	t2->next = t->next;
+	t2->vertex = vm;
+	t2->edge = e;
+	t2->face = t->face;
 	
+	h->twin = t2;
+	h->next = h2;
+	assert(h->vertex == v1); // unchanged
+	assert(h->edge == e); // unchanged
+	//h->face unchanged
+
+	t->twin = h2;
+	t->next = t2;
+	assert(t->vertex == v2); // unchanged
+	t->edge = e2;
+	//t->face unchanged
+
+
+	// Phase 4: Delete unused elements
+    erase_face(f_not_used);
+    erase_halfedge(h_not_used);
+
+	*/
+	
+	
+	//when should I loop around the faces?
+	//have to do it after the new edge is created!
+	
+	//do{
+		//get the vertex of the halfedge
+		//create a new edge
+		//emplace edge
+		//put in the edge information; make it a sharp edge
+		//create new halfedges 
+		//put in the halfedge information
+		//
+
+	//}
+	//while()
+	
+	// Phase 5: Return the correct iterator
+	//return vm;
+
 	(void)e; //this line avoids 'unused parameter' warnings. You can delete it as you fill in the function.
     return std::nullopt;
 }
@@ -314,6 +419,37 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 	// Reminder: This function does not update the vertex positions.
 	// Remember to also fill in extrude_helper (A2L4h)
 
+	/*HalfedgeRef org = f -> halfedge;
+
+	HalfedgeRef h1 = org->next; 
+
+	//for the first one
+	VertexRef v1 = emplace_vertex(); //create a new vertice
+	EdgeRef e1 = emplace_edge(); //create a new edge
+			
+	while(h1 != org) //if the next halfedge is not the original halfedge
+	{
+		h1 = h1 -> next;
+
+		VertexRef v1 = emplace_vertex(); //create a new vertice
+		EdgeRef e1 = emplace_edge(); //create a new edge
+		EdgeRef e2 = emplace_edge(); //create a new edge to connect the vertices
+		FaceRef f1 = emplace_face();
+
+	}
+
+	EdgeRef e2 = emplace_edge(); //create a new edge to connect the last certice to the first */
+
+
+
+	//get the face
+	//get the halfedge of the face
+	//make sure the halfedge is inside the face
+	//move around the halfedge to all vertices and back to original halfedge
+	//duplicate those vertices and make connections with edges to original vertices and new vertices
+	//also set faces and half edges and whatnot
+
+
 	(void)f;
     return std::nullopt;
 }
@@ -330,9 +466,42 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
  * does not create or destroy mesh elements.
  */
 std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
+	std::cout << describe() << std::endl;
 	//A2L1: Flip Edge
+	HalfedgeRef h = e->halfedge; //get the halfedge
+	HalfedgeRef t = h->twin; //get the twin of the halfedge
+
+	FaceRef f1 = h -> face; //get the face of the mesh
+	FaceRef f2 = t -> face;
+
+	if(f1 -> boundary == true || f2 -> boundary == true)
+	{return std::nullopt;}
+
+
+	//make a check if the halfedges are inside or outside the face with boundary tag
+	//if true, return
+
+
+	//else, do these operations
+	VertexRef v1 = h->next->vertex; //get v1 which is the the next vertex of h
+	VertexRef v2 = t->next->vertex; //get v2 which is the next vertex of t
+	VertexRef v3 = h->next->next->vertex; //get v3 which is the next next vertex of h
+	VertexRef v4 = t->next->next->vertex; //get  v4 which is the next next vertex of t
+	// disconnect
+	v1->halfedge = h->next;
+	v2->halfedge = t->next;
+	f1->halfedge = h;
+	f2->halfedge = t;
+	// connect
+	t->vertex = v3;
+	h->vertex = v4;
+	f1->halfedge = h;
+	f2->halfedge = t;
+
+	//std::cout << describe() << std::endl;
+	return e;
 	
-    return std::nullopt;
+    //return std::nullopt;
 }
 
 
@@ -392,6 +561,11 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(EdgeRef e) 
 
 	//Reminder: use interpolate_data() to merge corner_uv / corner_normal data on halfedges
 	// (also works for bone_weights data on vertices!)
+
+	//delete the edge!
+	//keep the vertices
+	//merge the vertices!
+	//
 	
     return std::nullopt;
 }
