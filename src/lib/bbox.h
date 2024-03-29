@@ -86,7 +86,107 @@ struct BBox {
 		// [times.x,times.y], update times with the new intersection times.
 		// This means at least one of tmin and tmax must be within the range
 
+		float tmin, tmax, tymin, tymax, tzmin, tzmax;
+
+		Vec3 invdir = 1 / ray.dir;
+		//invdir = floatmax; // max float 
+
+		//int zerocounter = 0;
+
+		//if(!(min.x == max.x)) //if minx and maxx are not equal (not flat in this axis)
+		//{
+			//if ray.dir.x == 0, that means there's no movement in the x direction, means all of this is ommited
+			//if(ray.dir.x != 0 )
+			//{
+				if(invdir.x >= 0) { 
+				tmin = (min.x - ray.point.x) * invdir.x; 
+				tmax = (max.x - ray.point.x) * invdir.x; 
+				} 
+				else 
+				{ 
+				tmin = (max.x - ray.point.x) * invdir.x; 
+				tmax = (min.x - ray.point.x) * invdir.x; 
+				}
+			//}
+		//}
+		//else
+		//zerocounter ++;
+		
+
+		//if(!(min.y == max.y)) //ifminy and maxy are not equal(not flat in this axis)
+		//{
+			//if(ray.dir.y != 0 )
+			//{
+				if (invdir.y >= 0) 
+				{ 
+					tymin = (min.y - ray.point.y) * invdir.y; 
+					tymax = (max.y - ray.point.y) * invdir.y; 
+				} 
+				else 
+				{ 
+					tymin = (max.x - ray.point.y) * invdir.y; 
+					tymax = (min.x - ray.point.y) * invdir.y; 
+				}
+				
+				if ((tmin > tymax) || (tymin > tmax))
+					return false;
+
+				if (tymin > tmin)
+					tmin = tymin;
+				if (tymax < tmax)
+					tmax = tymax;
+			//}
+		//}
+		/*else
+		{
+			zerocounter ++;
+			if(zerocounter > 1)
+			return false;
+		} */
+
+		//if(!(min.z == max.z)) //if minz and maxz are not equal(not flat in this axis)
+		//{
+			//if(ray.dir.z != 0)
+			//{
+				if (invdir.z >= 0) 
+				{ 
+					tzmin = (min.z - ray.point.z) * invdir.z; 
+					tzmax = (max.z - ray.point.z) * invdir.z; 
+				} 
+				else 
+				{ 
+					tzmin = (max.x - ray.point.z) * invdir.z; 
+					tzmax = (min.x - ray.point.z) * invdir.z; 
+				}
+				
+				if ((tmin > tzmax) || (tzmin > tmax))
+					return false;
+
+				if (tzmin > tmin) 
+					tmin = tzmin;
+				if (tzmax < tmax)
+					tmax = tzmax;
+			//}
+		//}
+		/*else
+		{			
+			zerocounter ++;
+			if(zerocounter > 1)
+			return false;
+		} */
+
+		if(tmin > times.y || tmax < times.x ) //both out of bounds
 		return false;
+		
+		if(tmin > times.x) //if minimum is greater than the minimum bound
+		times.x = tmin;
+
+		if(tmax < times.y)//if maximum is lesser than the maximum bound
+		times.y = tmax;
+
+    	return true;
+
+		//return false;
 	}
 
 	/// Get the eight corner points of the bounding box

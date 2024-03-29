@@ -26,14 +26,138 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
 	//A3T3 - build a bvh
 
 	// Keep these
-    nodes.clear();
-    primitives = std::move(prims);
+    
+	nodes.clear(); //clear the nodes
+    primitives = std::move(prims); //move the primitives
+	BBox start;
 
-    // Construct a BVH from the given vector of primitives and maximum leaf
-    // size configuration.
+	
+	printf(" %f ",primitives[0].bbox().center().z );
+	printf(" %f ",primitives[1].bbox().center().z );
+	printf(" %f ",primitives[2].bbox().center().z );
+	printf(" %f ",primitives[3].bbox().center().z );
+	for(int x = 0; x< primitives.size(); x++)
+	{
+		start.enclose(primitives[x].bbox());
+	}
 
-	//TODO
+	//new_node(start, 0, primitives.size(),1,2);
+	// HELPER FUNCTION -----------------------------
+	
 
+	// HELPER FUNCTION ----------------------
+
+	for(int a = 0; a < 3; a++)
+	{
+
+		makeTree(start, 0, primitives.size(), 0, max_leaf_size, a);
+	}
+
+}
+
+template<typename Primitive>
+size_t BVH<Primitive>::makeTree(BBox box, size_t start, size_t size, size_t leaf_num, size_t max_leaf_size, int axis)
+	{
+		int numBuckets = 10; //number of buckets
+		float bucketSize = 0.0f; //size of buckets
+		float len = 0.0f; //center of the current node bbox
+		
+		std::vector<SAHBucketData> buckets = std::vector<SAHBucketData>{10}; //vector of buckets
+		std::vector<size_t> startingPrim = std::vector<size_t>{10}; //vector of starting primitives for buckets
+
+		float SAHCost = 0.0f; //all the SAH variables 
+		float sA = 0.0f; //surface area
+		float sB = 0.0f;
+		size_t nA = 0; //num primitives
+		size_t nB = 0;
+		float bestSAH = FLT_MAX; //best SAH 
+		int SAHIndexL = 0; //index of the best SAH
+		int SAHIndexR = 0; //index of the best SAH
+
+		if(leaf_num == max_leaf_size)
+		{ //return new_node(box, start, size,0,0); 
+		 return leaf_num;
+		}
+
+		if(axis == 0 ) //x axis
+		len = box.max.x - box.min.x;
+		else if(axis == 1) //yaxis
+		len = box.max.y - box.min.y;
+		else //zaxis
+		len = box.max.z - box.min.z;
+
+		printf(" %f ", len);
+		if(int(len) == 0)
+		return new_node(box, start, size, leaf_num , leaf_num); //make new leaf node based on best SAH
+
+		
+
+		bucketSize = float((len)/numBuckets); //get the size of each buckets
+		
+		for(size_t i = start; i < size; i ++) //range of primitives
+		{
+			
+			float buc = 0;
+			if(axis == 0 )
+			buc = ((primitives[i].bbox().center().x) /bucketSize);
+			else if(axis == 1)
+			buc = ((primitives[i].bbox().center().y) /bucketSize);
+			else
+			buc = ((primitives[i].bbox().center().z) /bucketSize);
+
+			//printf(" %f ", buc);
+
+			buckets[int(buc)].bb.enclose(primitives[i].bbox()); //enclose the primitive bbox in the bucket bbox
+
+			if(buckets[int(buc)].num_prims == 0)
+			{startingPrim[int(buc)] = i;}
+			
+			//printf(" %f ", buckets[int(buc)].bb.center().z);
+
+			buckets[int(buc)].num_prims += 1; //increase num primitives
+
+			if(buckets[int(buc)].num_prims == primitives.size())
+			{
+				return new_node(buckets[int(buc)].bb, start, size, leaf_num , leaf_num); //make new leaf node based on best SAH
+			}
+			
+
+		}
+		
+		for(int s = 0; s < numBuckets; s++) //conduct SAH on each partition of bucket 
+		{
+			for(int b = 0; b < numBuckets; b++) //conduct SAH on each partition of bucket 
+			{
+				if((s < b) && !(buckets[s].bb.empty() || buckets[b].bb.empty())  ) //s will always be left side, b will always be right side
+				{ 
+					sA = buckets[s].bb.surface_area();
+					sB = buckets[b].bb.surface_area();
+					nA = buckets[s].num_prims;
+					nB = buckets[b].num_prims;
+					//printf(" %f ", sB);
+					SAHCost = sA * float(nA) + sB * float(nB);
+					if((SAHCost < bestSAH) && (SAHCost > 0.0f))
+					{
+						//printf("%f", SAHCost);
+						bestSAH = SAHCost;
+						SAHIndexL = s;
+						SAHIndexR = b;
+					}
+
+		
+					//SANA SBNB
+					//conduct SAH equation 
+					//update SAHIndex with the best SAH 
+					//update indicies 
+				}
+			}
+		}
+		printf(" %d %d ", SAHIndexL, SAHIndexR);
+		
+		size_t indl = makeTree(buckets[SAHIndexL].bb, startingPrim[SAHIndexL],buckets[SAHIndexL].num_prims, leaf_num + 1, max_leaf_size,axis);
+		size_t indr = makeTree(buckets[SAHIndexR].bb, startingPrim[SAHIndexR],buckets[SAHIndexR].num_prims, leaf_num + 1, max_leaf_size, axis);
+		
+		return new_node(box,start, size, indl, indr); //make new leaf node based on best SAH
 }
 
 template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {

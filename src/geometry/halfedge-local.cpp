@@ -498,6 +498,9 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 	f1->halfedge = h;
 	f2->halfedge = t;
 
+	//change the way other halfedges go
+	
+
 	//std::cout << describe() << std::endl;
 	return e;
 	

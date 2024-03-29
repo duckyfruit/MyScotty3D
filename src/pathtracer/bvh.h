@@ -25,6 +25,7 @@ public:
 	BVH() = default;
 	BVH(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
 	void build(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
+	size_t makeTree(BBox box, size_t start, size_t size, size_t leaf_num, size_t max_leaf_size, int axis);
 
 	BVH(BVH&& src) = default;
 	BVH& operator=(BVH&& src) = default;
@@ -41,6 +42,7 @@ public:
 	uint32_t visualize(GL::Lines& lines, GL::Lines& active, uint32_t level,
 	                   const Mat4& trans) const;
 	size_t n_primitives() const;
+
 
 	std::vector<Primitive> destructure();
 	void clear();
