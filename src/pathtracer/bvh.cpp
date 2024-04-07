@@ -29,16 +29,19 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     
 	nodes.clear(); //clear the nodes
     primitives = std::move(prims); //move the primitives
-	BBox start;
+	/*BBox start;
+
+	std::vector<BBox> boxes;
 
 	
 	printf(" %f ",primitives[0].bbox().center().z );
 	printf(" %f ",primitives[1].bbox().center().z );
 	printf(" %f ",primitives[2].bbox().center().z );
-	printf(" %f ",primitives[3].bbox().center().z );
-	for(int x = 0; x< primitives.size(); x++)
+	printf(" %f ",primitives[3].bbox().center().z ); */
+	/*for(int x = 0; x< primitives.size(); x++)
 	{
 		start.enclose(primitives[x].bbox());
+		boxes.push_back(primitives[x].bbox());
 	}
 
 	//new_node(start, 0, primitives.size(),1,2);
@@ -47,117 +50,344 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
 
 	// HELPER FUNCTION ----------------------
 
-	for(int a = 0; a < 3; a++)
+
+	makeTree(start,primitives.size(), boxes, 0, max_leaf_size);
+
+	for(int i = 0; i < nodes.size(); i++)
 	{
-
-		makeTree(start, 0, primitives.size(), 0, max_leaf_size, a);
-	}
-
+		printf("%d\n", i);
+		printf(" %f %f %f \n", nodes[i].bbox.min.x, nodes[i].bbox.min.y, nodes[i].bbox.min.z );
+	} */
+	
 }
 
 template<typename Primitive>
-size_t BVH<Primitive>::makeTree(BBox box, size_t start, size_t size, size_t leaf_num, size_t max_leaf_size, int axis)
+size_t BVH<Primitive>::makeTree(BBox box, size_t size, std::vector<BBox> boxes, size_t leaf_num, size_t max_leaf_size)
 	{
-		int numBuckets = 10; //number of buckets
+		size_t root = new_node(); //node we are working on!
+		
+		if((leaf_num == max_leaf_size) || (size <= 1))
+		{ 
+			printf("%zu %zu\n", root, size);
+			nodes[root].bbox = box;
+			nodes[root].start = leaf_num;
+			nodes[root].size = size;
+			nodes[root].l = nodes.size() - 1;
+			nodes[root].r = nodes.size() - 1;
+			
+			return root;
+		}
+
+		size_t numBuckets = 10; //number of buckets
 		float bucketSize = 0.0f; //size of buckets
 		float len = 0.0f; //center of the current node bbox
-		
-		std::vector<SAHBucketData> buckets = std::vector<SAHBucketData>{10}; //vector of buckets
-		std::vector<size_t> startingPrim = std::vector<size_t>{10}; //vector of starting primitives for buckets
+		int bestAxis = 0; //leave it as X for now
 
-		float SAHCost = 0.0f; //all the SAH variables 
 		float sA = 0.0f; //surface area
 		float sB = 0.0f;
 		size_t nA = 0; //num primitives
 		size_t nB = 0;
 		float bestSAH = FLT_MAX; //best SAH 
-		int SAHIndexL = 0; //index of the best SAH
-		int SAHIndexR = 0; //index of the best SAH
+		float SAHCost = 0.0f; //all the SAH variables 
 
-		if(leaf_num == max_leaf_size)
-		{ //return new_node(box, start, size,0,0); 
-		 return leaf_num;
+		BBox partitionL;
+		BBox partitionR;
+		size_t sizeL = 0;
+		size_t sizeR = 0;
+		size_t indl = 0;
+		size_t indr = 0;
+
+
+		std::vector<SAHBucketData> bucketsX = std::vector<SAHBucketData>{numBuckets}; //vector of buckets
+		std::vector<SAHBucketData> bucketsY = std::vector<SAHBucketData>{numBuckets}; //vector of buckets
+		std::vector<SAHBucketData> bucketsZ = std::vector<SAHBucketData>{numBuckets}; //vector of buckets
+
+		std::vector<std::vector<BBox>> mapX(numBuckets); //maps of primitives
+		std::vector<std::vector<BBox>> mapY(numBuckets); //maps of primitives
+		std::vector<std::vector<BBox>> mapZ(numBuckets); //maps of primitives
+
+		std::vector<BBox> primL; //left primitives
+		std::vector<BBox> primR; //right primitives
+
+		for(size_t i = 0; i < numBuckets; i++) //create the 2d array of bboxes
+		{
+			mapX[i] = std::vector<BBox>(size); 
+			mapY[i] = std::vector<BBox>(size); 
+			mapZ[i] = std::vector<BBox>(size); 
 		}
 
-		if(axis == 0 ) //x axis
-		len = box.max.x - box.min.x;
-		else if(axis == 1) //yaxis
-		len = box.max.y - box.min.y;
-		else //zaxis
-		len = box.max.z - box.min.z;
-
-		printf(" %f ", len);
-		if(int(len) == 0)
-		return new_node(box, start, size, leaf_num , leaf_num); //make new leaf node based on best SAH
-
-		
-
-		bucketSize = float((len)/numBuckets); //get the size of each buckets
-		
-		for(size_t i = start; i < size; i ++) //range of primitives
+		for(int axis = 0; axis < 3; axis ++)
 		{
+			if(axis == 0 ) //x axis
+			len = box.max.x - box.min.x;
+			else if(axis == 1) //yaxis
+			len = box.max.y - box.min.y;
+			else //zaxis
+			len = box.max.z - box.min.z;
 			
-			float buc = 0;
-			if(axis == 0 )
-			buc = ((primitives[i].bbox().center().x) /bucketSize);
-			else if(axis == 1)
-			buc = ((primitives[i].bbox().center().y) /bucketSize);
-			else
-			buc = ((primitives[i].bbox().center().z) /bucketSize);
-
-			//printf(" %f ", buc);
-
-			buckets[int(buc)].bb.enclose(primitives[i].bbox()); //enclose the primitive bbox in the bucket bbox
-
-			if(buckets[int(buc)].num_prims == 0)
-			{startingPrim[int(buc)] = i;}
-			
-			//printf(" %f ", buckets[int(buc)].bb.center().z);
-
-			buckets[int(buc)].num_prims += 1; //increase num primitives
-
-			if(buckets[int(buc)].num_prims == primitives.size())
+			if(!(int(len) == 0))
 			{
-				return new_node(buckets[int(buc)].bb, start, size, leaf_num , leaf_num); //make new leaf node based on best SAH
-			}
-			
 
-		}
-		
-		for(int s = 0; s < numBuckets; s++) //conduct SAH on each partition of bucket 
-		{
-			for(int b = 0; b < numBuckets; b++) //conduct SAH on each partition of bucket 
-			{
-				if((s < b) && !(buckets[s].bb.empty() || buckets[b].bb.empty())  ) //s will always be left side, b will always be right side
-				{ 
-					sA = buckets[s].bb.surface_area();
-					sB = buckets[b].bb.surface_area();
-					nA = buckets[s].num_prims;
-					nB = buckets[b].num_prims;
-					//printf(" %f ", sB);
-					SAHCost = sA * float(nA) + sB * float(nB);
-					if((SAHCost < bestSAH) && (SAHCost > 0.0f))
+					bucketSize = float((len)/(numBuckets - 1)); //get the size of each buckets
+					//printf("%f\n",bucketSize);
+					for(size_t i = 0; i < size; i ++) //range of primitives
 					{
-						//printf("%f", SAHCost);
-						bestSAH = SAHCost;
-						SAHIndexL = s;
-						SAHIndexR = b;
-					}
+						int buc = 0;
 
-		
-					//SANA SBNB
-					//conduct SAH equation 
-					//update SAHIndex with the best SAH 
-					//update indicies 
+						if(axis == 0 )
+						{
+
+							buc = int((boxes[i].center().x) /bucketSize);
+							bucketsX[buc].bb.enclose(boxes[i]); //enclose the primitive bbox in the bucket bbox
+							mapX[buc][bucketsX[buc].num_prims] = boxes[i];
+							bucketsX[buc].num_prims += 1; //increase num primitives
+							//printf("%d\n",buc);
+						}
+						else if(axis == 1)
+						{
+							buc = int((boxes[i].center().y) /bucketSize);
+							bucketsY[buc].bb.enclose(boxes[i]); //enclose the primitive bbox in the bucket bbox
+							mapY[buc][bucketsY[buc].num_prims] = boxes[i];
+							bucketsY[buc].num_prims += 1; //increase num primitives
+						}
+						else
+						{
+							buc = int((boxes[i].center().z) /bucketSize);
+							bucketsZ[buc].bb.enclose(boxes[i]); //enclose the primitive bbox in the bucket bbox
+							mapZ[buc][bucketsZ[buc].num_prims] = boxes[i];
+							bucketsZ[buc].num_prims += 1; //increase num primitives
+						}
+
+					}
+				
+				
+				for(int s = 1; s < numBuckets - 1; s++) //conduct SAH on each partition of bucket 
+				{
+					sA = 0.0f;
+					sB = 0.0f;
+					nA = 0;
+					nB = 0;
+					if(axis == 0)
+					{
+						for(int x = 0; x < s; x ++)
+						{
+							sA += bucketsX[x].bb.surface_area();
+							nA += bucketsX[x].num_prims;
+						}
+					
+						for(int y = s; y < numBuckets; y ++)
+						{
+							sB += bucketsX[y].bb.surface_area();
+							nB += bucketsX[y].num_prims;
+						}
+					
+						SAHCost = sA * float(nA) + sB * float(nB);
+						if((SAHCost < bestSAH) && (SAHCost != 0) )
+						{
+							//printf("%f %f %zu %zu\n", sA, sB, nA, nB);
+							bestAxis = axis;
+							bestSAH = SAHCost;
+							partitionL.reset();
+							sizeL = 0;
+							primL.clear();
+							partitionR.reset();
+							sizeR = 0;
+							primR.clear();
+							for(int x = 0; x < s; x ++)
+							{
+								if(!bucketsX[x].bb.empty())
+								{
+									partitionL.enclose(bucketsX[x].bb);
+									sizeL += bucketsX[x].num_prims;
+
+									//printf("%f %f\n",bucketsX[x].bb.min.x, bucketsX[x].bb.max.x);
+
+									for(int i = 0; i < mapX[x].size(); i++)
+									{
+										if(!mapX[x][i].empty())
+										primL.push_back(mapX[x][i]);
+									}
+									
+								}
+							}
+						
+							for(int y = s; y < numBuckets; y ++)
+							{
+								if(!bucketsX[y].bb.empty())
+								{
+									partitionR.enclose(bucketsX[y].bb);
+									sizeR += bucketsX[y].num_prims;
+									//printf("%f %f\n",bucketsX[y].bb.min.x, bucketsX[y].bb.max.x);
+									for(int i = 0; i < mapX[y].size(); i++)
+									{
+										if(!mapX[y][i].empty())
+										primR.push_back(mapX[y][i]);
+									}
+								}
+							}
+					
+						}
+					}
+					else if(axis == 1)
+					{
+						for(int x = 0; x < s; x ++)
+						{
+							sA += bucketsY[x].bb.surface_area();
+							nA += bucketsY[x].num_prims;
+						}
+						
+						for(int y = s; y < numBuckets; y ++)
+						{
+							sB += bucketsY[y].bb.surface_area();
+							nB += bucketsY[y].num_prims;
+						}
+					
+						SAHCost = sA * float(nA) + sB * float(nB);
+						if((SAHCost < bestSAH) && (SAHCost != 0) )
+						{
+							
+							bestAxis = axis;
+							bestSAH = SAHCost;
+
+							partitionL.reset();
+							sizeL = 0;
+							primL.clear();
+							partitionR.reset();
+							sizeR = 0;
+							primR.clear();
+							for(int x = 0; x < s; x ++)
+							{
+								if(!bucketsY[x].bb.empty())
+								{
+									partitionL.enclose(bucketsY[x].bb);
+									sizeL += bucketsY[x].num_prims;
+
+									for(int i = 0; i < mapY[x].size(); i++)
+									{
+										if(!mapY[x][i].empty())
+										primL.push_back(mapY[x][i]);
+									}
+								}
+							}
+							for(int y = s; y < numBuckets; y ++)
+							{
+								if(!bucketsY[y].bb.empty())
+								{
+									partitionR.enclose(bucketsY[y].bb);
+									sizeR += bucketsY[y].num_prims;
+
+									for(int i = 0; i < mapY[y].size(); i++)
+									{
+										if(!mapY[y][i].empty())
+										primR.push_back(mapY[y][i]);
+									}
+								}
+							}
+						}
+					}
+					else
+					{
+						for(int x = 0; x < s; x ++)
+						{
+							sA += bucketsZ[x].bb.surface_area();
+							nA += bucketsZ[x].num_prims;
+						}
+						for(int y = s; y < numBuckets; y ++)
+						{
+							sB += bucketsZ[y].bb.surface_area();
+							nB += bucketsZ[y].num_prims;
+						}
+						SAHCost = sA * float(nA) + sB * float(nB);
+						
+						if((SAHCost < bestSAH) && (SAHCost != 0) )
+						{
+							
+							bestAxis = axis;
+							bestSAH = SAHCost;
+
+							partitionL.reset();
+							sizeL = 0;
+							primL.clear();
+							partitionR.reset();
+							sizeR = 0;
+							primR.clear();
+							for(int x = 0; x < s; x ++)
+							{
+								if(!bucketsZ[x].bb.empty())
+								{
+									partitionL.enclose(bucketsZ[x].bb);
+									sizeL += bucketsZ[x].num_prims;
+
+									for(int i = 0; i < mapZ[x].size(); i++)
+									{
+										if(!mapZ[x][i].empty())
+										primL.push_back(mapZ[x][i]);
+									}
+								}
+							}
+							for(int y = s; y < numBuckets; y ++)
+							{
+								if(!bucketsZ[y].bb.empty())
+								{
+									partitionR.enclose(bucketsZ[y].bb);
+									sizeR += bucketsZ[y].num_prims;
+
+									for(int i = 0; i < mapZ[y].size(); i++)
+									{
+										if(!mapZ[y][i].empty())
+										primR.push_back(mapZ[y][i]);
+									}
+								}
+							}
+						}
+					}
 				}
+			
 			}
 		}
-		printf(" %d %d ", SAHIndexL, SAHIndexR);
+
+		//sort primitives at the end?
+		for(size_t i = 0; i < sizeL; i ++)
+		{
+			primitives[i].bbox() = primL[i];
+		}
+		for(size_t i = sizeL; i < sizeL + sizeR; i ++)
+		{
+			primitives[i].bbox() = primR[i - sizeL];
+		}
 		
-		size_t indl = makeTree(buckets[SAHIndexL].bb, startingPrim[SAHIndexL],buckets[SAHIndexL].num_prims, leaf_num + 1, max_leaf_size,axis);
-		size_t indr = makeTree(buckets[SAHIndexR].bb, startingPrim[SAHIndexR],buckets[SAHIndexR].num_prims, leaf_num + 1, max_leaf_size, axis);
+
+		if(bestAxis == 0)
+		{
+			indl = makeTree(partitionL, sizeL, primL, leaf_num + 1, max_leaf_size);
+			indr = makeTree(partitionR, sizeR, primR, leaf_num + 2, max_leaf_size);
+		}
+		else if (bestAxis == 1)
+		{
+			indl = makeTree(partitionL, sizeL, primL,leaf_num + 1, max_leaf_size);
+			indr = makeTree(partitionR, sizeR, primR,leaf_num + 2, max_leaf_size);
+		}
+		else
+		{
+			indl = makeTree(partitionL, sizeL, primL,leaf_num + 1, max_leaf_size);
+			indr = makeTree(partitionR, sizeR, primR,leaf_num + 2, max_leaf_size);
+		}
+
+		printf("%zu %zu\n", root, size);
+		nodes[root].bbox = box;
+		nodes[root].start = 0;
+		nodes[root].size = size;
+		nodes[root].l = indl;
+		nodes[root].r = indr;
+
+		//printf("%zu %zu", indl, indr);
+		//size_t node =  new_node(box, 0, size, indl, indr); //make new leaf node based on best SAH
+		//printf(" %zu\n ", root);
+
 		
-		return new_node(box,start, size, indl, indr); //make new leaf node based on best SAH
+
+		return root;
+		
 }
 
 template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {

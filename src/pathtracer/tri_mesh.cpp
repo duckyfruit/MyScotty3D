@@ -90,9 +90,6 @@ Trace Triangle::hit(const Ray& ray) const {
     Tri_Mesh_Vert v_0 = vertex_list[v0];
     Tri_Mesh_Vert v_1 = vertex_list[v1];
     Tri_Mesh_Vert v_2 = vertex_list[v2];
-    (void)v_0;
-    (void)v_1;
-    (void)v_2;
 	Trace ret;
     ret.origin = ray.point;
 
@@ -106,7 +103,7 @@ Trace Triangle::hit(const Ray& ray) const {
 	//barycentric coordinates must be positive
 
 	Vec3 s = ray.point - v_0.position;
-	Vec3 d = ray.dir;
+	Vec3 d = ray.dir.unit();
 	Vec3 e1 = v_1.position - v_0.position;
 	Vec3 e2 =  v_2.position - v_0.position;
 	
@@ -124,17 +121,17 @@ Trace Triangle::hit(const Ray& ray) const {
 		return ret;
 	}
 
-	denom = 1/denom;
-	u = denom * (dot(-1.0f * (cross(s,e2)), d));
-	v = denom * (dot((cross(e1,d)), s));
-	t = denom * (dot(-1.0f * (cross(s,e2)), e1));
+	
+	u = (dot(-1.0f * (cross(s,e2)), d))/denom;
+	v = (dot((cross(e1,d)), s))/denom;
+	t = (dot(-1.0f * (cross(s,e2)), e1))/denom;
 
 	w = 1 - u - v;
 
-	Vec3 P = ray.point + t * ray.dir;
+	//Vec3 P = ray.point + t * ray.dir;
 
-	float dist = sqrt(pow(P.x - ray.point.x,2.0f) + pow(P.y - ray.point.y,2.0f) + pow(P.z - ray.point.z,2.0f));
-	if((dist < ray.dist_bounds.x) || (dist > ray.dist_bounds.y))
+	//float dist = sqrt(pow(P.x - ray.point.x,2.0f) + pow(P.y - ray.point.y,2.0f) + pow(P.z - ray.point.z,2.0f));
+	if((t< ray.dist_bounds.x) || (t > ray.dist_bounds.y))
 	{
 		ret.hit = false;
 		return ret;		
@@ -155,8 +152,9 @@ Trace Triangle::hit(const Ray& ray) const {
 	}
 	
 	ret.hit = true;
-	ret.distance = dist;
-	ret.position = ray.at(dist);
+	ret.origin = ray.point;
+	ret.distance = t;
+	ret.position = ray.at(t);
 	ret.normal = v_0.normal * w + v_1.normal * u + v_2.normal * v;
 	ret.uv = v_0.uv * w + v_1.uv * u + v_2.uv * v;
 

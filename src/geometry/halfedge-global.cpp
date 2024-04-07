@@ -375,7 +375,7 @@ void Halfedge_Mesh::catmark_subdivide() {
 			f = h1 -> face; //get the face of the halfedge
 			twin = h1 -> twin; //get the twin of the halfedge
 
-			printf(" %d \n", f->boundary);
+		
 
 			if(!((h1 -> face -> boundary)))
 			{
@@ -395,11 +395,11 @@ void Halfedge_Mesh::catmark_subdivide() {
 			h1 = h1 -> twin;
 		} while(h1 != org -> twin);
 
-		printf("%f %f\n", count, num);
+		
 
 		if(!border)
 		{
-			printf("non border!\n");
+			
 			faceAvg = faceAvg / count;
 			edgeAvg = edgeAvg / count;
 			vertex_positions[v] = (faceAvg + 2 * edgeAvg + (count - 3.0f) * v-> position)/count;

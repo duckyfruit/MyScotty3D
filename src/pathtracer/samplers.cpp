@@ -111,7 +111,9 @@ Vec3 Sphere::Uniform::sample(RNG &rng) const {
     // Generate a uniformly random point on the unit sphere.
     // Tip: start with Hemisphere::Uniform
 
-    return Vec3{};
+	Samplers::Hemisphere::Uniform unif;
+	
+    return Vec3{unif.sample(rng)};
 }
 
 float Sphere::Uniform::pdf(Vec3 dir) const {

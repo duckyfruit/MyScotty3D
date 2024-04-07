@@ -36,13 +36,11 @@ PT::Trace Sphere::hit(Ray ray) const {
 	//Vec3 s = ray.point - v_0.position;
 	Vec3 d = ray.dir;
 	Vec3 o = ray.point;
-	Vec3 p1 = Vec3{};
-	Vec3 p2 = Vec3{};
-	Vec3 finp = Vec3{};
 	float r = Sphere::radius;
 
 	float tpos = 0.0f; //time to find these values!
 	float tneg = 0.0f;
+	float t = 0.0f;
 	float magd = sqrt(pow(d.x, 2.0f) + pow(d.y, 2.0f) + pow(d.z, 2.0f));
 	float mago = sqrt(pow(o.x, 2.0f) + pow(o.y, 2.0f) + pow(o.z, 2.0f));
 
@@ -52,48 +50,56 @@ PT::Trace Sphere::hit(Ray ray) const {
 		return ret;
 	}
 
-	float discr = 4.0f * pow(dot(o, d), 2.0f) - 4.0f * pow(magd, 2.0f) *  (pow(mago, 2.0f) - pow(r, 2.0f));
+	float discr = 4.0f * pow(dot(o, d), 2.0f) - (4.0f * pow(magd, 2.0f) *  (pow(mago, 2.0f) - pow(r, 2.0f)));
 	if(discr < 0.0f)
 	{
 		ret.hit = false; 
 		return ret;
 	}
 
-	float posnum = -2.0f * dot(o, d) + sqrt(4.0f * pow(dot(o, d), 2.0f) - 4.0f * pow(magd, 2.0f) *  (pow(mago, 2.0f) - pow(r, 2.0f)));
-	float negnum = -2.0f * dot(o, d) - sqrt(4.0f * pow(dot(o, d), 2.0f) - 4.0f * pow(magd, 2.0f) *  (pow(mago, 2.0f) - pow(r, 2.0f)));
+	float posnum = -2.0f * dot(o, d) + sqrt(discr);
+	float negnum = -2.0f * dot(o, d) - sqrt(discr);
 	float denom = 2.0f * pow(magd, 2.0f);
 
 	tpos = posnum / denom;
 	tneg = negnum / denom;
 
-	p1 = o + tpos * d;
-	p2 = o + tneg * d;
-	
-	finp = p1;
-
-	float p1dist = sqrt(pow(p1.x - ray.point.x,2.0f) + pow(p1.y - ray.point.y,2.0f) + pow(p1.z - ray.point.z,2.0f));
-	float p2dist = sqrt(pow(p2.x - ray.point.x,2.0f) + pow(p2.y - ray.point.y,2.0f) + pow(p2.z - ray.point.z,2.0f));
-
-	float fpdist = p1dist;
-
-	if(p1dist > p2dist)
+	if(abs(tpos) > abs(tneg))
 	{
-		if((p2dist < ray.dist_bounds.x) || (p2dist > ray.dist_bounds.y))
-		{
-			ret.hit = false;
-			return ret;	
-		}
-		finp = p2;
-		fpdist = p2dist;
+		t = tpos;
+		tpos = tneg;
+		tneg = t;
+		
+	}
+
+	if((tpos >= ray.dist_bounds.x) && (tpos <= ray.dist_bounds.y))
+	{
+		ret.hit = true; 
+		ret.origin = ray.point;      // was there an intersection?
+		ret.distance = tpos;   // at what distance did the intersection occur?
+		ret.position = ray.at(tpos); // where was the intersection?
+		ret.normal = ret.position/r;   // what was the surface normal at the intersection?
+		ret.uv = Sphere::uv(ret.normal); 	   // what was the uv coordinates at the intersection? (you may find Sphere::uv to be useful)
+		return ret;
+
+	}
+	else if((tneg >= ray.dist_bounds.x) && (tneg <= ray.dist_bounds.y))
+	{
+		ret.hit = true; 
+		ret.origin = ray.point;      // was there an intersection?
+		ret.distance = tneg;   // at what distance did the intersection occur?
+		ret.position = ray.at(tneg); // where was the intersection?
+		ret.normal = ret.position/r;   // what was the surface normal at the intersection?
+		ret.uv = Sphere::uv(ret.normal); 	   // what was the uv coordinates at the intersection? (you may find Sphere::uv to be useful)
+		return ret;
 	}
 	else
 	{
-		if((p1dist < ray.dist_bounds.x) || (p1dist > ray.dist_bounds.y))
-		{
-			ret.hit = false;
-			return ret;	
-		}
+		ret.hit = false; 
+		return ret;
+
 	}
+	
 	
 	/*if((p1dist < ray.dist_bounds.x) || (p1dist > ray.dist_bounds.y))
 	{
@@ -105,13 +111,6 @@ PT::Trace Sphere::hit(Ray ray) const {
 		finp = p2;
 		fpdist = p2dist;
 	} */
-	
-	ret.hit = true;       // was there an intersection?
-    ret.distance = fpdist;   // at what distance did the intersection occur?
-    ret.position = ray.at(fpdist); // where was the intersection?
-    ret.normal = finp.unit();   // what was the surface normal at the intersection?
-	ret.uv = Sphere::uv(ret.normal); 	   // what was the uv coordinates at the intersection? (you may find Sphere::uv to be useful)
-    return ret;
 
 	/*
     ret.hit = false;       // was there an intersection?

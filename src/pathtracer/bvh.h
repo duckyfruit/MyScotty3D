@@ -25,7 +25,7 @@ public:
 	BVH() = default;
 	BVH(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
 	void build(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
-	size_t makeTree(BBox box, size_t start, size_t size, size_t leaf_num, size_t max_leaf_size, int axis);
+	size_t makeTree(BBox box,size_t size, std::vector<BBox> boxes, size_t leaf_num, size_t max_leaf_size);
 
 	BVH(BVH&& src) = default;
 	BVH& operator=(BVH&& src) = default;

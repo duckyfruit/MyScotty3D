@@ -25,6 +25,7 @@ static void check_invariants(const PT::BVH<PT::Triangle>& bvh, const PT::BVH<PT:
 		}
 		// Check that the bbox is correct
 		if (Test::differs(node.bbox.min, prims.min) || Test::differs(node.bbox.max, prims.max)) {
+			printf(" %f %f %f \n %f %f %f \n", node.bbox.min.x, node.bbox.min.y, node.bbox.min.z, prims.min.x,prims.min.y, prims.min.z );
 			throw Test::error("A leaf's bbox was not tight!");
 		}
 		return;
