@@ -42,13 +42,26 @@ std::vector< Mat4 > Skeleton::bind_pose() const {
 
 	std::vector< Mat4 > bind;
 	bind.reserve(bones.size());
-
+	
+	//check if it has a parent, if so, the bind pose is jus that bone's extent
 	//NOTE: bones is guaranteed to be ordered such that parents appear before child bones.
 
+
 	for (auto const &bone : bones) {
-		(void)bone; //avoid complaints about unused bone
+		//(void)bone; //avoid complaints about unused bone
 		//placeholder -- your code should actually compute the correct transform:
-		bind.emplace_back(Mat4::I);
+
+		if(bone.parent == -1U)//if the bones doesn't have a parent, emplace back just the basepoint r
+		{ bind.emplace_back(Mat4::translate(base)); } //use translate function 
+		else
+		{
+			Vec3 ext = bones[bone.parent].extent;
+			bind.emplace_back(bind[bone.parent] * Mat4::translate(ext));
+		}
+		//if they do have a parent, get their parents translation multiplied by their parents extent
+
+		//for all the bones, bind should emplace_back
+		//bind.emplace_back(Mat4::I);
 	}
 
 	assert(bind.size() == bones.size()); //should have a transform for every bone.
@@ -60,14 +73,36 @@ std::vector< Mat4 > Skeleton::current_pose() const {
 
 	//Similar to bind_pose(), but takes rotation from Bone::pose into account.
 	// (and translation from Skeleton::base_offset!)
+	std::vector< Mat4 > curr;
+	curr.reserve(bones.size());
 
+	Vec3 rotX = Vec3();
+	Vec3 rotY = Vec3();
+	Vec3 rotZ = Vec3();
+	
 	//You'll probably want to write a loop similar to bind_pose().
+	for (auto const &bone : bones) {
+			//(void)bone; //avoid complaints about unused bone
+			//placeholder -- your code should actually compute the correct transform:
+			bone.compute_rotation_axes(&rotX, &rotY, &rotZ);
+			if(bone.parent == -1U)//if the bones doesn't have a parent, emplace back just the basepoint r
+			{ curr.emplace_back(Mat4::translate(base + base_offset) * Mat4::angle_axis(bone.pose.z,rotZ) * Mat4::angle_axis(bone.pose.y,rotY) * Mat4::angle_axis(bone.pose.x,rotX)); } //use translate function 
+			else
+			{
+				Vec3 ext = bones[bone.parent].extent;
 
+				curr.emplace_back(curr[bone.parent] * (Mat4::translate(ext) * Mat4::angle_axis(bone.pose.z,rotZ) * Mat4::angle_axis(bone.pose.y,rotY) * Mat4::angle_axis(bone.pose.x,rotX)));
+			}
+			//if they do have a parent, get their parents translation multiplied by their parents extent
+
+			//for all the bones, bind should emplace_back
+			//bind.emplace_back(Mat4::I);
+		}
 	//Useful functions:
 	//Bone::compute_rotation_axes() will tell you what axes (in local bone space) Bone::pose should rotate around.
 	//Mat4::angle_axis(angle, axis) will produce a matrix that rotates angle (in degrees) around a given axis.
-
-	return std::vector< Mat4 >(bones.size(), Mat4::I);
+	assert(curr.size() == bones.size());
+	return curr;
 
 }
 
