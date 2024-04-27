@@ -7,6 +7,59 @@ bool Particles::Particle::update(const PT::Aggregate &scene, Vec3 const &gravity
 
 	// Compute the trajectory of this particle for the next dt seconds.
 
+	float time = dt;
+
+	while(time > 0.0f)
+	{
+		Ray r = Ray(position,velocity);
+		PT::Trace tr = scene.hit(r);
+		
+		if(tr.hit) //if there is a hit
+		{
+			
+			float sin = (cross(tr.position, velocity).norm())/(tr.position.norm()*velocity.norm());
+			
+			float d  = radius / sin;
+			float avg = (tr.distance-d)/ velocity.norm();
+			
+
+
+			if(avg >time)
+			{
+				velocity = velocity +(gravity*time);
+				position = position + (velocity*time);
+				time = 0.0f;
+			}
+			else if(avg < 0)
+				velocity = velocity - ((2.0f * dot(velocity,tr.normal.normalize())) * tr.normal.normalize());
+			else
+			{
+				velocity = velocity + (gravity*time);
+				position = position + (velocity*time);
+				time = time - avg;
+				velocity = velocity - ((2.0f * dot(velocity,tr.normal.normalize())) * tr.normal.normalize());
+
+			}
+
+		}
+		else
+		{
+			position = position + (velocity*time);
+			velocity = velocity +(gravity*time);
+			time = 0.0f;
+
+		}
+
+	}
+	
+	age = age - dt;
+	if((age) > 0.0f)
+	return true;
+	else
+	return false;
+
+
+
 	// (1) Build a ray representing the particle's path as if it travelled at constant velocity.
 
 	// (2) Intersect the ray with the scene and account for collisions. Be careful when placing
@@ -18,7 +71,6 @@ bool Particles::Particle::update(const PT::Aggregate &scene, Vec3 const &gravity
 
 	// (5) Decrease the particle's age and return 'false' if it should be removed.
 
-	return false;
 }
 
 void Particles::advance(const PT::Aggregate& scene, const Mat4& to_world, float dt) {

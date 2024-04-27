@@ -18,6 +18,10 @@ Test test_a4_task4_particles_free_fall("a4.task4.particles.free_fall", []() {
 	Vec3 expected_velocity = Vec3(0.000000f, -9.897995f, 0.000000f);
 	Vec3 actual_pos = particles.particles[0].position;
 	Vec3 actual_velocity = particles.particles[0].velocity;
+
+	printf("%f %f %f",particles.particles[0].position.x, particles.particles[0].position.y, particles.particles[0].position.z );
+	printf("%f %f %f", particles.particles[0].velocity.x, particles.particles[0].velocity.y, particles.particles[0].velocity.z);
+
 	if (Test::differs(expected_pos, actual_pos)) {
 		throw Test::error("Particle position differs from expected value!");
 	} else if (Test::differs(expected_velocity, actual_velocity)) {
@@ -40,6 +44,8 @@ Test test_a4_task4_particles_ground_only("a4.task4.particles.ground_only", []() 
 	Vec3 expected_velocity = Vec3(0.000000f, -2.058001f, 0.000000f);
 	Vec3 actual_pos = particles.particles[0].position;
 	Vec3 actual_velocity = particles.particles[0].velocity;
+	printf("%f %f %f",particles.particles[0].position.x, particles.particles[0].position.y, particles.particles[0].position.z );
+	printf("%f %f %f", particles.particles[0].velocity.x, particles.particles[0].velocity.y, particles.particles[0].velocity.z);
 	if (Test::differs(expected_pos, actual_pos)) {
 		throw Test::error("Particle position differs from expected value!");
 	} else if (Test::differs(expected_velocity, actual_velocity)) {
